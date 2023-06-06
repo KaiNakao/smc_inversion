@@ -57,23 +57,6 @@ int main() {
     // matrix L^T L
     auto llmat = init::calc_ll(lmat);
 
-    double xf = 1.;
-    double yf = -19;
-    double zf = -13;
-    double strike = 2.;
-    double dip = 72.;
-    double log_sigma_sar2 = 0;
-    double log_sigma_gnss2 = 1.;
-    double log_alpha2 = -4;
-    std::vector<double> particle = {
-        xf, yf, zf, strike, dip, log_sigma_sar2, log_sigma_gnss2, log_alpha2};
-    for (int iter = 0; iter < 1; iter++) {
-        double tmp = smc_fault::calc_likelihood(
-            particle, cny_fault, coor_fault, dvec, obs_points, obs_unitvec,
-            obs_sigma, leta, node_to_elem, id_dof, nsar, ngnss, lmat, llmat);
-        std::cout << tmp << std::endl;
-    }
-    std::exit(1);
     // range for xf, yf, zf, strike, dip, log_sigma2_sar, log_sigma2_gnss,
     // log_alpha2
     std::vector<std::vector<double>> range = {{-10, 10}, {-30, 0}, {-30, -1},
