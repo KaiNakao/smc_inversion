@@ -225,29 +225,30 @@ std::vector<double> calc_mean_particles(
     return mean;
 }
 
-std::vector<std::vector<double>> calc_cov_particles(
+std::vector<double> calc_cov_particles(
     const std::vector<std::vector<double>> &particles,
     const std::vector<double> &weights, const std::vector<double> &mean) {
     int n_particle = particles.size();
     int ndim = particles.at(0).size();
-    std::vector<std::vector<double>> cov(ndim, std::vector<double>(ndim));
+    std::vector<double> cov_flat(ndim * ndim);
     for (int iparticle = 0; iparticle < n_particle; iparticle++) {
+        const auto &particle = particles[iparticle];
+        const auto &weight = weights[iparticle];
         for (int idim = 0; idim < ndim; idim++) {
             for (int jdim = 0; jdim < ndim; jdim++) {
-                cov.at(idim).at(jdim) +=
-                    weights.at(iparticle) *
-                    (particles.at(iparticle).at(idim) - mean.at(idim)) *
-                    (particles.at(iparticle).at(jdim) - mean.at(jdim));
+                cov_flat[idim * ndim + jdim] += weight *
+                                                (particle[idim] - mean[idim]) *
+                                                (particle[jdim] - mean[jdim]);
             }
         }
     }
-    return cov;
+    return cov_flat;
 }
 
 void resample_particles(
     std::vector<std::vector<double>> &particles,
     const std::vector<double> &weights, std::vector<double> &likelihood_ls,
-    std::vector<double> &prior_ls, const std::vector<std::vector<double>> &cov,
+    std::vector<double> &prior_ls, std::vector<double> &cov_flat,
     const double &gamma, const std::vector<double> &dvec,
     const std::vector<double> &obs_sigma,
     const std::vector<double> &sigma2_full,
@@ -308,14 +309,13 @@ void resample_particles(
 
     // covariance matrix for MCMC proposal distribution
     const double s = 0.2;
-    double *cov_flat = (double *)malloc(sizeof(double) * ndim * ndim);
     for (int i = 0; i < ndim; i++) {
         for (int j = 0; j < ndim; j++) {
-            cov_flat[i * ndim + j] = cov[i][j] * s * s;
+            cov_flat[i * ndim + j] *= s * s;
         }
     }
     // LAPACK function for LU decomposition of matrix
-    LAPACKE_dpotrf(LAPACK_ROW_MAJOR, 'L', ndim, cov_flat, ndim);
+    LAPACKE_dpotrf(LAPACK_ROW_MAJOR, 'L', ndim, &cov_flat[0], ndim);
 
     // MCMC sampling from the updated distribution
     for (int i_particle = 0; i_particle < n_particle; i_particle++) {
@@ -338,7 +338,7 @@ void resample_particles(
                 rand.at(idim) = dist_stnorm(engine);
             }
             cblas_dtrmv(CblasRowMajor, CblasLower, CblasNoTrans, CblasNonUnit,
-                        ndim, cov_flat, ndim, &rand[0], 1);
+                        ndim, &cov_flat[0], ndim, &rand[0], 1);
             std::vector<double> particle_cand(ndim);
             for (int idim = 0; idim < ndim; idim++) {
                 particle_cand[idim] = particle_cur[idim] + rand[idim];
@@ -379,8 +379,6 @@ void resample_particles(
     likelihood_ls = likelihood_ls_new;
     prior_ls = prior_ls_new;
 
-    // manually deallocate C-style array
-    free(cov_flat);
     return;
 }
 
@@ -452,14 +450,14 @@ double smc_exec(std::vector<std::vector<double>> &particles,
 
         // calculate mean and covariance of the samples
         std::vector<double> mean = calc_mean_particles(particles, weights);
-        std::vector<std::vector<double>> cov =
+        std::vector<double> cov_flat =
             calc_cov_particles(particles, weights, mean);
 
         // resampling and MCMC sampling from the updated distribution
-        resample_particles(particles, weights, likelihood_ls, prior_ls, cov,
-                           gamma, dvec, obs_sigma, sigma2_full, gmat_flat,
-                           log_sigma_sar2, log_sigma_gnss2, nsar, ngnss,
-                           log_alpha2, lmat_index, lmat_val);
+        resample_particles(particles, weights, likelihood_ls, prior_ls,
+                           cov_flat, gamma, dvec, obs_sigma, sigma2_full,
+                           gmat_flat, log_sigma_sar2, log_sigma_gnss2, nsar,
+                           ngnss, log_alpha2, lmat_index, lmat_val);
 
         // output result of stage j (disabled)
         // std::ofstream ofs(output_dir + std::to_string(iter) + ".csv");

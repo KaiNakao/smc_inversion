@@ -52,14 +52,14 @@ std::vector<double> calc_mean_particles(
     const std::vector<std::vector<double>> &particles,
     const std::vector<double> &weights);
 
-std::vector<std::vector<double>> calc_cov_particles(
+std::vector<double> calc_cov_particles(
     const std::vector<std::vector<double>> &particles,
     const std::vector<double> &weights, const std::vector<double> &mean);
 
 void resample_particles(
     std::vector<std::vector<double>> &particles,
     const std::vector<double> &weights, std::vector<double> &likelihood_ls,
-    std::vector<double> &prior_ls, const std::vector<std::vector<double>> &cov,
+    std::vector<double> &prior_ls, std::vector<double> &cov_flat,
     const double &gamma, const std::vector<double> &dvec,
     const std::vector<double> &obs_sigma,
     const std::vector<double> &sigma2_full,
