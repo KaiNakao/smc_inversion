@@ -70,8 +70,8 @@ std::vector<std::vector<double>> gen_init_particles(
 
     // probability distribution instance for generating samples from piror
     // (uniform distribution)
-    std::random_device seed_gen;
-    std::mt19937 engine(seed_gen());
+    // std::random_device seed_gen;
+    std::mt19937 engine(12345);
     std::vector<std::uniform_real_distribution<>> dist_vec(range.size());
     for (int idim = 0; idim < range.size(); idim++) {
         std::uniform_real_distribution<> dist(range.at(idim).at(0),
@@ -240,8 +240,8 @@ void resample_particles_parallel(
     const std::vector<std::vector<double>> &lmat,
     const std::vector<std::vector<double>> &llmat, const int &nsar,
     const int &ngnss) {
-    std::random_device seed_gen;
-    std::mt19937 engine(seed_gen());
+    // std::random_device seed_gen;
+    std::mt19937 engine(12345);
     // probability distribution for MCCMC metropolis test
     std::uniform_real_distribution<> dist_metropolis(0., 1.);
     // standard normal distribution

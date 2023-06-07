@@ -55,8 +55,8 @@ void gen_init_particles(std::vector<std::vector<double>> &particles,
                         const int &ngnss, const double &log_alpha2,
                         const std::vector<std::vector<double>> &lmat,
                         const std::vector<std::vector<double>> &llmat) {
-    std::random_device seed_gen;
-    std::mt19937 engine(seed_gen());
+    // std::random_device seed_gen;
+    std::mt19937 engine(12345);
     particles.resize(nparticle);
 
     // Gibbs sampling from Truncated Multi Variate Normal distribution
@@ -241,8 +241,8 @@ void resample_particles(
     const std::vector<std::vector<double>> &gmat, const double &log_sigma_sar2,
     const double &log_sigma_gnss2, const int &nsar, const int &ngnss,
     const double &log_alpha2, const std::vector<std::vector<double>> &lmat) {
-    std::random_device seed_gen;
-    std::mt19937 engine(seed_gen());
+    // std::random_device seed_gen;
+    std::mt19937 engine(12345);
     // probability distribution for MCCMC metropolis test
     std::uniform_real_distribution<> dist_metropolis(0., 1.);
     // standard normal distribution
