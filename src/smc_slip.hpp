@@ -1,4 +1,4 @@
-
+#include <mkl.h>
 #include <mkl_lapacke.h>
 #include <omp.h>
 
@@ -17,7 +17,7 @@ double calc_likelihood(const std::vector<double> &svec,
                        const std::vector<double> &dvec,
                        const std::vector<double> &obs_sigma,
                        const std::vector<double> &sigma2_full,
-                       const std::vector<std::vector<double>> &gmat,
+                       const std::vector<double> &gmat_flat,
                        const double &log_sigma_sar2,
                        const double &log_sigma_gnss2, const int &nsar,
                        const int &ngnss, double &delta_norm);
@@ -31,7 +31,7 @@ void gen_init_particles(std::vector<std::vector<double>> &particles,
                         const std::vector<double> &dvec,
                         const std::vector<double> &obs_sigma,
                         const std::vector<double> &sigma2_full,
-                        const std::vector<std::vector<double>> &gmat,
+                        const std::vector<double> &gmat_flat,
                         const double &log_sigma_sar2,
                         const double &log_sigma_gnss2, const int &nsar,
                         const int &ngnss, const double &log_alpha2,
@@ -54,14 +54,14 @@ std::vector<std::vector<double>> calc_cov_particles(
     const std::vector<std::vector<double>> &particles,
     const std::vector<double> &weights, const std::vector<double> &mean);
 
-std::vector<std::vector<double>> resample_particles_parallel(
-    const std::vector<std::vector<double>> &particles_org,
+void resample_particles(
+    std::vector<std::vector<double>> &particles,
     const std::vector<double> &weights, std::vector<double> &likelihood_ls,
     std::vector<double> &prior_ls, const std::vector<std::vector<double>> &cov,
     const double &gamma, const std::vector<double> &dvec,
     const std::vector<double> &obs_sigma,
     const std::vector<double> &sigma2_full,
-    const std::vector<std::vector<double>> &gmat, const double &log_sigma_sar2,
+    const std::vector<double> &gmat_flat, const double &log_sigma_sar2,
     const double &log_sigma_gnss2, const int &nsar, const int &ngnss,
     const double &log_alpha2, const std::vector<std::vector<double>> &lmat);
 

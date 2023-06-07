@@ -15,12 +15,16 @@ double calc_likelihood(const std::vector<double> &svec,
                        const std::vector<double> &dvec,
                        const std::vector<double> &obs_sigma,
                        const std::vector<double> &sigma2_full,
-                       const std::vector<std::vector<double>> &gmat,
+                       const std::vector<double> &gmat_flat,
                        const double &log_sigma_sar2,
                        const double &log_sigma_gnss2, const int &nsar,
                        const int &ngnss, double &delta_norm) {
     // delta norm is a measure for residual
-    std::vector<double> gsvec = linalg::matvec(gmat, svec);
+    // std::vector<double> gsvec = linalg::matvec(gmat, svec);
+    std::vector<double> gsvec(dvec.size());
+    cblas_dgemv(CblasRowMajor, CblasNoTrans, dvec.size(), svec.size(), 1.,
+                &gmat_flat[0], svec.size(), &svec[0], 1, 0., &gsvec[0], 1);
+
     delta_norm = 0.;
     double delta_loss = 0;
     for (int i = 0; i < dvec.size(); i++) {
@@ -49,7 +53,7 @@ void gen_init_particles(std::vector<std::vector<double>> &particles,
                         const std::vector<double> &dvec,
                         const std::vector<double> &obs_sigma,
                         const std::vector<double> &sigma2_full,
-                        const std::vector<std::vector<double>> &gmat,
+                        const std::vector<double> &gmat_flat,
                         const double &log_sigma_sar2,
                         const double &log_sigma_gnss2, const int &nsar,
                         const int &ngnss, const double &log_alpha2,
@@ -103,7 +107,7 @@ void gen_init_particles(std::vector<std::vector<double>> &particles,
         // calculate negative log likelihood and prior
         double delta_norm;
         likelihood_ls.at(iparticle) = calc_likelihood(
-            yvec, dvec, obs_sigma, sigma2_full, gmat, log_sigma_sar2,
+            yvec, dvec, obs_sigma, sigma2_full, gmat_flat, log_sigma_sar2,
             log_sigma_gnss2, nsar, ngnss, delta_norm);
         prior_ls.at(iparticle) = calc_prior(yvec, log_alpha2, lmat);
     }
@@ -238,7 +242,7 @@ void resample_particles(
     const double &gamma, const std::vector<double> &dvec,
     const std::vector<double> &obs_sigma,
     const std::vector<double> &sigma2_full,
-    const std::vector<std::vector<double>> &gmat, const double &log_sigma_sar2,
+    const std::vector<double> &gmat_flat, const double &log_sigma_sar2,
     const double &log_sigma_gnss2, const int &nsar, const int &ngnss,
     const double &log_alpha2, const std::vector<std::vector<double>> &lmat) {
     // std::random_device seed_gen;
@@ -338,7 +342,7 @@ void resample_particles(
             // of the proposed configuration
             double delta_norm = 0.;
             double likelihood_cand = calc_likelihood(
-                particle_cand, dvec, obs_sigma, sigma2_full, gmat,
+                particle_cand, dvec, obs_sigma, sigma2_full, gmat_flat,
                 log_sigma_sar2, log_sigma_gnss2, nsar, ngnss, delta_norm);
             double prior_cand = calc_prior(particle_cand, log_alpha2, lmat);
             double post_cand = gamma * likelihood_cand + prior_cand;
@@ -382,13 +386,21 @@ double smc_exec(std::vector<std::vector<double>> &particles,
                 const std::vector<std::vector<double>> &lmat,
                 const std::vector<std::vector<double>> &llmat,
                 const std::vector<int> &id_dof) {
+    // greens function
+    const int ndim = gmat.at(0).size();
+    std::vector<double> gmat_flat(gmat.size() * gmat.at(0).size());
+    for (int i = 0; i < gmat.size(); i++) {
+        for (int j = 0; j < gmat.at(0).size(); j++) {
+            gmat_flat.at(i * ndim + j) = gmat.at(i).at(j);
+        }
+    }
     // list for (negative log) likelihood for each particles
     std::vector<double> likelihood_ls(nparticle);
     // list for (negative log) prior for each particles
     std::vector<double> prior_ls(nparticle);
     // sampling from the prior distribution
     gen_init_particles(particles, likelihood_ls, prior_ls, nparticle, dvec,
-                       obs_sigma, sigma2_full, gmat, log_sigma_sar2,
+                       obs_sigma, sigma2_full, gmat_flat, log_sigma_sar2,
                        log_sigma_gnss2, nsar, ngnss, log_alpha2, lmat, llmat);
 
     // output result of stage 0 (disabled)
@@ -434,7 +446,7 @@ double smc_exec(std::vector<std::vector<double>> &particles,
 
         // resampling and MCMC sampling from the updated distribution
         resample_particles(particles, weights, likelihood_ls, prior_ls, cov,
-                           gamma, dvec, obs_sigma, sigma2_full, gmat,
+                           gamma, dvec, obs_sigma, sigma2_full, gmat_flat,
                            log_sigma_sar2, log_sigma_gnss2, nsar, ngnss,
                            log_alpha2, lmat);
 
