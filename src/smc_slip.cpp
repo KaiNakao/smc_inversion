@@ -1,11 +1,4 @@
-#include <mkl_lapacke.h>
-
-#include <fstream>
-#include <random>
-#include <unordered_map>
-#include <vector>
-
-#include "linalg.hpp"
+#include "smc_slip.hpp"
 namespace smc_slip {
 
 double cdf_norm(double x, double mu, double sigma2) {

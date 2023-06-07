@@ -1,5 +1,6 @@
 
 #include <mkl_lapacke.h>
+#include <omp.h>
 
 #include <fstream>
 #include <random>
