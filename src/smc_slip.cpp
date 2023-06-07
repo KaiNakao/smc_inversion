@@ -20,7 +20,6 @@ double calc_likelihood(const std::vector<double> &svec,
                        const double &log_sigma_gnss2, const int &nsar,
                        const int &ngnss, double &delta_norm) {
     // delta norm is a measure for residual
-    // std::vector<double> gsvec = linalg::matvec(gmat, svec);
     std::vector<double> gsvec(dvec.size());
     cblas_dgemv(CblasRowMajor, CblasNoTrans, dvec.size(), svec.size(), 1.,
                 &gmat_flat[0], svec.size(), &svec[0], 1, 0., &gsvec[0], 1);
@@ -38,15 +37,23 @@ double calc_likelihood(const std::vector<double> &svec,
 }
 
 double calc_prior(const std::vector<double> &svec, const double &log_alpha2,
-                  const std::vector<std::vector<double>> &lmat) {
-    std::vector<double> lsvec = linalg::matvec(lmat, svec);
+                  const std::vector<int> &lmat_index,
+                  const std::vector<double> &lmat_val) {
+    std::vector<double> lsvec(lmat_index.size() / 5);
+    for (int i = 0; i < lsvec.size(); i++) {
+        for (int j = 0; j < 5; j++) {
+            lsvec[i] += lmat_val[5 * i + j] * svec[lmat_index[5 * i + j]];
+        }
+    }
+
     double prior = 0.;
     for (int i = 0; i < lsvec.size(); i++) {
         prior += pow(lsvec.at(i), 2.) / (2. * exp(log_alpha2));
     }
 
-    return lmat.size() / 2. * log_alpha2 + prior;
+    return lsvec.size() / 2. * log_alpha2 + prior;
 }
+
 void gen_init_particles(std::vector<std::vector<double>> &particles,
                         std::vector<double> &likelihood_ls,
                         std::vector<double> &prior_ls, const int &nparticle,
@@ -57,7 +64,8 @@ void gen_init_particles(std::vector<std::vector<double>> &particles,
                         const double &log_sigma_sar2,
                         const double &log_sigma_gnss2, const int &nsar,
                         const int &ngnss, const double &log_alpha2,
-                        const std::vector<std::vector<double>> &lmat,
+                        const std::vector<int> &lmat_index,
+                        const std::vector<double> &lmat_val,
                         const std::vector<std::vector<double>> &llmat) {
     // std::random_device seed_gen;
     std::mt19937 engine(12345);
@@ -109,7 +117,8 @@ void gen_init_particles(std::vector<std::vector<double>> &particles,
         likelihood_ls.at(iparticle) = calc_likelihood(
             yvec, dvec, obs_sigma, sigma2_full, gmat_flat, log_sigma_sar2,
             log_sigma_gnss2, nsar, ngnss, delta_norm);
-        prior_ls.at(iparticle) = calc_prior(yvec, log_alpha2, lmat);
+        prior_ls.at(iparticle) =
+            calc_prior(yvec, log_alpha2, lmat_index, lmat_val);
     }
 }
 
@@ -244,7 +253,8 @@ void resample_particles(
     const std::vector<double> &sigma2_full,
     const std::vector<double> &gmat_flat, const double &log_sigma_sar2,
     const double &log_sigma_gnss2, const int &nsar, const int &ngnss,
-    const double &log_alpha2, const std::vector<std::vector<double>> &lmat) {
+    const double &log_alpha2, const std::vector<int> &lmat_index,
+    const std::vector<double> &lmat_val) {
     // std::random_device seed_gen;
     std::mt19937 engine(12345);
     // probability distribution for MCCMC metropolis test
@@ -344,7 +354,8 @@ void resample_particles(
             double likelihood_cand = calc_likelihood(
                 particle_cand, dvec, obs_sigma, sigma2_full, gmat_flat,
                 log_sigma_sar2, log_sigma_gnss2, nsar, ngnss, delta_norm);
-            double prior_cand = calc_prior(particle_cand, log_alpha2, lmat);
+            double prior_cand =
+                calc_prior(particle_cand, log_alpha2, lmat_index, lmat_val);
             double post_cand = gamma * likelihood_cand + prior_cand;
 
             // metropolis test
@@ -383,7 +394,8 @@ double smc_exec(std::vector<std::vector<double>> &particles,
                 const std::vector<std::vector<double>> &gmat,
                 const double &log_sigma_sar2, const double &log_sigma_gnss2,
                 const int &nsar, const int &ngnss, const double &log_alpha2,
-                const std::vector<std::vector<double>> &lmat,
+                const std::vector<int> &lmat_index,
+                const std::vector<double> &lmat_val,
                 const std::vector<std::vector<double>> &llmat,
                 const std::vector<int> &id_dof) {
     // greens function
@@ -401,7 +413,8 @@ double smc_exec(std::vector<std::vector<double>> &particles,
     // sampling from the prior distribution
     gen_init_particles(particles, likelihood_ls, prior_ls, nparticle, dvec,
                        obs_sigma, sigma2_full, gmat_flat, log_sigma_sar2,
-                       log_sigma_gnss2, nsar, ngnss, log_alpha2, lmat, llmat);
+                       log_sigma_gnss2, nsar, ngnss, log_alpha2, lmat_index,
+                       lmat_val, llmat);
 
     // output result of stage 0 (disabled)
     // std::ofstream ofs(output_dir + std::to_string(0) + ".csv");
@@ -448,7 +461,7 @@ double smc_exec(std::vector<std::vector<double>> &particles,
         resample_particles(particles, weights, likelihood_ls, prior_ls, cov,
                            gamma, dvec, obs_sigma, sigma2_full, gmat_flat,
                            log_sigma_sar2, log_sigma_gnss2, nsar, ngnss,
-                           log_alpha2, lmat);
+                           log_alpha2, lmat_index, lmat_val);
 
         // output result of stage j (disabled)
         // std::ofstream ofs(output_dir + std::to_string(iter) + ".csv");

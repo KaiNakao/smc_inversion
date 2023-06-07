@@ -12,7 +12,7 @@ double calc_likelihood(
     const std::vector<double> &obs_sigma, const double &leta,
     const std::unordered_map<int, std::vector<int>> &node_to_elem,
     const std::vector<int> &id_dof, const int &nsar, const int &ngnss,
-    const std::vector<std::vector<double>> &lmat,
+    const std::vector<int> &lmat_index, const std::vector<double> &lmat_val,
     const std::vector<std::vector<double>> &llmat) {
     double xf = particle.at(0);
     double yf = particle.at(1);
@@ -47,7 +47,7 @@ double calc_likelihood(
     double neglog = smc_slip::smc_exec(
         particles_slip, "output_slip/", nparticle_slip, dvec, obs_sigma,
         sigma2_full, gmat, log_sigma_sar2, log_sigma_gnss2, nsar, ngnss,
-        log_alpha2, lmat, llmat, id_dof);
+        log_alpha2, lmat_index, lmat_val, llmat, id_dof);
     return neglog;
 }
 
@@ -61,8 +61,8 @@ std::vector<std::vector<double>> gen_init_particles(
     const std::vector<std::vector<double>> &obs_unitvec,
     const std::vector<double> &obs_sigma, const double &leta,
     const std::unordered_map<int, std::vector<int>> &node_to_elem,
-    const std::vector<int> &id_dof,
-    const std::vector<std::vector<double>> &lmat,
+    const std::vector<int> &id_dof, const std::vector<int> &lmat_index,
+    const std::vector<double> &lmat_val,
     const std::vector<std::vector<double>> &llmat, const int &nsar,
     const int &ngnss) {
     // dimension of particle
@@ -92,9 +92,10 @@ std::vector<std::vector<double>> gen_init_particles(
         }
         particles.at(iparticle) = particle;
         // calculate negative log likelihood for the sample
-        likelihood_ls.at(iparticle) = calc_likelihood(
-            particle, cny_fault, coor_fault, dvec, obs_points, obs_unitvec,
-            obs_sigma, leta, node_to_elem, id_dof, nsar, ngnss, lmat, llmat);
+        likelihood_ls.at(iparticle) =
+            calc_likelihood(particle, cny_fault, coor_fault, dvec, obs_points,
+                            obs_unitvec, obs_sigma, leta, node_to_elem, id_dof,
+                            nsar, ngnss, lmat_index, lmat_val, llmat);
         std::cout << "iparticle: " << iparticle
                   << " likelihood: " << likelihood_ls.at(iparticle)
                   << std::endl;
@@ -236,8 +237,8 @@ void resample_particles_parallel(
     const std::vector<std::vector<double>> &obs_unitvec,
     const std::vector<double> &obs_sigma, const double &leta,
     const std::unordered_map<int, std::vector<int>> &node_to_elem,
-    const std::vector<int> &id_dof,
-    const std::vector<std::vector<double>> &lmat,
+    const std::vector<int> &id_dof, const std::vector<int> &lmat_index,
+    const std::vector<double> &lmat_val,
     const std::vector<std::vector<double>> &llmat, const int &nsar,
     const int &ngnss) {
     // std::random_device seed_gen;
@@ -312,7 +313,8 @@ void resample_particles_parallel(
         std::vector<double> particle_cur = particles.at(i_particle);
         double likelihood_cur = calc_likelihood(
             particle_cur, cny_fault, coor_fault, dvec, obs_points, obs_unitvec,
-            obs_sigma, leta, node_to_elem, id_dof, nsar, ngnss, lmat, llmat);
+            obs_sigma, leta, node_to_elem, id_dof, nsar, ngnss, lmat_index,
+            lmat_val, llmat);
 
         for (int j_particle : assigned_id[i_particle]) {
             // propose particle_cand
@@ -330,10 +332,10 @@ void resample_particles_parallel(
             }
 
             // calculate negative log likelihood of the proposed configuration
-            double likelihood_cand =
-                calc_likelihood(particle_cand, cny_fault, coor_fault, dvec,
-                                obs_points, obs_unitvec, obs_sigma, leta,
-                                node_to_elem, id_dof, nsar, ngnss, lmat, llmat);
+            double likelihood_cand = calc_likelihood(
+                particle_cand, cny_fault, coor_fault, dvec, obs_points,
+                obs_unitvec, obs_sigma, leta, node_to_elem, id_dof, nsar, ngnss,
+                lmat_index, lmat_val, llmat);
             double metropolis = dist_metropolis(engine);
 
             // metropolis test and check domain of definition
@@ -352,10 +354,10 @@ void resample_particles_parallel(
             // save to new particle list
             particles_new.at(j_particle) = particle_cur;
             likelihood_ls_new.at(j_particle) = likelihood_cur;
-            likelihood_cur =
-                calc_likelihood(particle_cur, cny_fault, coor_fault, dvec,
-                                obs_points, obs_unitvec, obs_sigma, leta,
-                                node_to_elem, id_dof, nsar, ngnss, lmat, llmat);
+            likelihood_cur = calc_likelihood(
+                particle_cur, cny_fault, coor_fault, dvec, obs_points,
+                obs_unitvec, obs_sigma, leta, node_to_elem, id_dof, nsar, ngnss,
+                lmat_index, lmat_val, llmat);
         }
     }
     // update configurations
@@ -379,7 +381,8 @@ void smc_exec(std::vector<std::vector<double>> &particles,
               const std::vector<double> &obs_sigma, const double &leta,
               const std::unordered_map<int, std::vector<int>> &node_to_elem,
               const std::vector<int> &id_dof,
-              const std::vector<std::vector<double>> &lmat,
+              const std::vector<int> &lmat_index,
+              const std::vector<double> &lmat_val,
               const std::vector<std::vector<double>> &llmat, const int &nsar,
               const int &ngnss) {
     // list for (negative log) likelihood for each particles
@@ -387,8 +390,8 @@ void smc_exec(std::vector<std::vector<double>> &particles,
     // sampling from the prior distribution
     particles = gen_init_particles(nparticle, range, likelihood_ls, cny_fault,
                                    coor_fault, obs_points, dvec, obs_unitvec,
-                                   obs_sigma, leta, node_to_elem, id_dof, lmat,
-                                   llmat, nsar, ngnss);
+                                   obs_sigma, leta, node_to_elem, id_dof,
+                                   lmat_index, lmat_val, llmat, nsar, ngnss);
 
     // output result of stage 0
     std::ofstream ofs(output_dir + std::to_string(0) + ".csv");
@@ -422,7 +425,7 @@ void smc_exec(std::vector<std::vector<double>> &particles,
         resample_particles_parallel(
             particles, weights, likelihood_ls, cov, gamma, cny_fault,
             coor_fault, obs_points, dvec, obs_unitvec, obs_sigma, leta,
-            node_to_elem, id_dof, lmat, llmat, nsar, ngnss);
+            node_to_elem, id_dof, lmat_index, lmat_val, llmat, nsar, ngnss);
 
         // output result of stage j
         std::ofstream ofs(output_dir + std::to_string(iter) + ".csv");

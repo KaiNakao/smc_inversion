@@ -134,4 +134,27 @@ std::vector<std::vector<double>> calc_ll(
     return ll;
 }
 
+void gen_sparse_lmat(const std::vector<std::vector<double>> &lmat,
+                     std::vector<int> &lmat_index,
+                     std::vector<double> &lmat_val) {
+    lmat_index.resize(5 * lmat.size());
+    lmat_val.resize(5 * lmat.size());
+    for (int i = 0; i < lmat.size(); i++) {
+        int cnt = 0;
+        for (int j = 0; j < lmat.at(0).size(); j++) {
+            double val = lmat.at(i).at(j);
+            if (fabs(val) > pow(10, -8)) {
+                // std::cout << j << " ";
+                lmat_index[5 * i + cnt] = j;
+                lmat_val[5 * i + cnt] = val;
+                cnt++;
+            }
+        }
+        while (cnt < 5) {
+            lmat_index[5 * i + cnt] = 0;
+            lmat_val[5 * i + cnt] = 0.;
+            cnt++;
+        }
+    }
+}
 }  // namespace init

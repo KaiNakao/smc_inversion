@@ -28,4 +28,8 @@ std::vector<std::vector<double>> gen_laplacian(const int &nnode, const int &nxi,
 
 std::vector<std::vector<double>> calc_ll(
     const std::vector<std::vector<double>> &lmat);
+
+void gen_sparse_lmat(const std::vector<std::vector<double>> &lmat,
+                     std::vector<int> &lmat_index,
+                     std::vector<double> &lmat_val);
 }  // namespace init

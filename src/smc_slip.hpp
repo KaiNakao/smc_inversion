@@ -23,7 +23,8 @@ double calc_likelihood(const std::vector<double> &svec,
                        const int &ngnss, double &delta_norm);
 
 double calc_prior(const std::vector<double> &svec, const double &log_alpha2,
-                  const std::vector<std::vector<double>> &lmat);
+                  const std::vector<int> &lmat_index,
+                  const std::vector<double> &lmat_val);
 
 void gen_init_particles(std::vector<std::vector<double>> &particles,
                         std::vector<double> &likelihood_ls,
@@ -35,7 +36,8 @@ void gen_init_particles(std::vector<std::vector<double>> &particles,
                         const double &log_sigma_sar2,
                         const double &log_sigma_gnss2, const int &nsar,
                         const int &ngnss, const double &log_alpha2,
-                        const std::vector<std::vector<double>> &lmat,
+                        const std::vector<int> &lmat_index,
+                        const std::vector<double> &lmat_val,
                         const std::vector<std::vector<double>> &llmat);
 
 std::vector<double> calc_mean_std_vector(const std::vector<double> &vec);
@@ -63,7 +65,8 @@ void resample_particles(
     const std::vector<double> &sigma2_full,
     const std::vector<double> &gmat_flat, const double &log_sigma_sar2,
     const double &log_sigma_gnss2, const int &nsar, const int &ngnss,
-    const double &log_alpha2, const std::vector<std::vector<double>> &lmat);
+    const double &log_alpha2, const std::vector<int> &lmat_index,
+    const std::vector<double> &lmat_val);
 
 double smc_exec(std::vector<std::vector<double>> &particles,
                 const std::string &output_dir, const int &nparticle,
@@ -73,7 +76,8 @@ double smc_exec(std::vector<std::vector<double>> &particles,
                 const std::vector<std::vector<double>> &gmat,
                 const double &log_sigma_sar2, const double &log_sigma_gnss2,
                 const int &nsar, const int &ngnss, const double &log_alpha2,
-                const std::vector<std::vector<double>> &lmat,
+                const std::vector<int> &lmat_index,
+                const std::vector<double> &lmat_val,
                 const std::vector<std::vector<double>> &llmat,
                 const std::vector<int> &id_dof);
 }  // namespace smc_slip

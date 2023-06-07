@@ -19,7 +19,7 @@ double calc_likelihood(
     const std::vector<double> &obs_sigma, const double &leta,
     const std::unordered_map<int, std::vector<int>> &node_to_elem,
     const std::vector<int> &id_dof, const int &nsar, const int &ngnss,
-    const std::vector<std::vector<double>> &lmat,
+    const std::vector<int> &lmat_index, const std::vector<double> &lmat_val,
     const std::vector<std::vector<double>> &llmat);
 
 std::vector<std::vector<double>> gen_init_particles(
@@ -32,8 +32,8 @@ std::vector<std::vector<double>> gen_init_particles(
     const std::vector<std::vector<double>> &obs_unitvec,
     const std::vector<double> &obs_sigma, const double &leta,
     const std::unordered_map<int, std::vector<int>> &node_to_elem,
-    const std::vector<int> &id_dof,
-    const std::vector<std::vector<double>> &lmat,
+    const std::vector<int> &id_dof, const std::vector<int> &lmat_index,
+    const std::vector<double> &lmat_val,
     const std::vector<std::vector<double>> &llmat, const int &nsar,
     const int &ngnss);
 
@@ -53,7 +53,7 @@ std::vector<std::vector<double>> calc_cov_particles(
     const std::vector<std::vector<double>> &particles,
     const std::vector<double> &weights, const std::vector<double> &mean);
 
-void resample_particles(
+void resample_particles_parallel(
     std::vector<std::vector<double>> &particles,
     const std::vector<double> &weights, std::vector<double> &likelihood_ls,
     const std::vector<std::vector<double>> &cov, const double &gamma,
@@ -64,8 +64,8 @@ void resample_particles(
     const std::vector<std::vector<double>> &obs_unitvec,
     const std::vector<double> &obs_sigma, const double &leta,
     const std::unordered_map<int, std::vector<int>> &node_to_elem,
-    const std::vector<int> &id_dof,
-    const std::vector<std::vector<double>> &lmat,
+    const std::vector<int> &id_dof, const std::vector<int> &lmat_index,
+    const std::vector<double> &lmat_val,
     const std::vector<std::vector<double>> &llmat, const int &nsar,
     const int &ngnss);
 
@@ -81,7 +81,8 @@ void smc_exec(std::vector<std::vector<double>> &particles,
               const std::vector<double> &obs_sigma, const double &leta,
               const std::unordered_map<int, std::vector<int>> &node_to_elem,
               const std::vector<int> &id_dof,
-              const std::vector<std::vector<double>> &lmat,
+              const std::vector<int> &lmat_index,
+              const std::vector<double> &lmat_val,
               const std::vector<std::vector<double>> &llmat, const int &nsar,
               const int &ngnss);
 }  // namespace smc_fault

@@ -56,6 +56,10 @@ int main() {
     auto lmat = init::gen_laplacian(nnode_fault, nxi, neta, dxi, deta, id_dof);
     // matrix L^T L
     auto llmat = init::calc_ll(lmat);
+    // sparse matrix form of lmat
+    std::vector<int> lmat_index;
+    std::vector<double> lmat_val;
+    init::gen_sparse_lmat(lmat, lmat_index, lmat_val);
 
     // Execute SMC for slip while fixing the fault
     std::vector<double> particle = {
@@ -64,7 +68,8 @@ int main() {
         2.77420866e-01, -6.57536267e+00, 2.20408325e+02};
     double likelihood = smc_fault::calc_likelihood(
         particle, cny_fault, coor_fault, dvec, obs_points, obs_unitvec,
-        obs_sigma, leta, node_to_elem, id_dof, nsar, ngnss, lmat, llmat);
+        obs_sigma, leta, node_to_elem, id_dof, nsar, ngnss, lmat_index,
+        lmat_val, llmat);
     std::cout << "result: " << likelihood << std::endl;
     std::exit(1);
 
@@ -80,5 +85,6 @@ int main() {
     std::vector<std::vector<double>> particles;
     smc_fault::smc_exec(particles, "output/", range, nparticle, cny_fault,
                         coor_fault, obs_points, dvec, obs_unitvec, obs_sigma,
-                        leta, node_to_elem, id_dof, lmat, llmat, nsar, ngnss);
+                        leta, node_to_elem, id_dof, lmat_index, lmat_val, llmat,
+                        nsar, ngnss);
 }
