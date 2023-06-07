@@ -57,6 +57,17 @@ int main() {
     // matrix L^T L
     auto llmat = init::calc_ll(lmat);
 
+    // Execute SMC for slip while fixing the fault
+    std::vector<double> particle = {
+        9.40751387e-01, -1.73475157e+01, -1.00443905e+01,
+        4.96780337e-01, 7.16747382e+01,  2.06857834e-01,
+        2.77420866e-01, -6.57536267e+00, 2.20408325e+02};
+    double likelihood = smc_fault::calc_likelihood(
+        particle, cny_fault, coor_fault, dvec, obs_points, obs_unitvec,
+        obs_sigma, leta, node_to_elem, id_dof, nsar, ngnss, lmat, llmat);
+    std::cout << "result: " << likelihood << std::endl;
+    std::exit(1);
+
     // range for xf, yf, zf, strike, dip, log_sigma2_sar, log_sigma2_gnss,
     // log_alpha2
     std::vector<std::vector<double>> range = {{-10, 10}, {-30, 0}, {-30, -1},
