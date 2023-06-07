@@ -242,6 +242,11 @@ std::vector<double> calc_cov_particles(
             }
         }
     }
+    for (int idim = 0; idim < ndim; idim++) {
+        for (int jdim = 0; jdim < ndim; jdim++) {
+            cov_flat[idim * ndim + jdim] *= 0.04;
+        }
+    }
     return cov_flat;
 }
 
@@ -307,13 +312,6 @@ void resample_particles(
         assigned_id[j_particle].push_back(i_particle);
     }
 
-    // covariance matrix for MCMC proposal distribution
-    const double s = 0.2;
-    for (int i = 0; i < ndim; i++) {
-        for (int j = 0; j < ndim; j++) {
-            cov_flat[i * ndim + j] *= s * s;
-        }
-    }
     // LAPACK function for LU decomposition of matrix
     LAPACKE_dpotrf(LAPACK_ROW_MAJOR, 'L', ndim, &cov_flat[0], ndim);
 
