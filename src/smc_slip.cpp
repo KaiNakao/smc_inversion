@@ -439,22 +439,22 @@ double smc_exec(std::vector<std::vector<double>> &particles,
                            log_alpha2, lmat);
 
         // output result of stage j (disabled)
-        std::ofstream ofs(output_dir + std::to_string(iter) + ".csv");
-        for (int iparticle = 0; iparticle < nparticle; iparticle++) {
-            const std::vector<double> particle = particles.at(iparticle);
-            std::vector<double> slip(lmat.size());
-            for (int idof = 0; idof < id_dof.size(); idof++) {
-                int inode = id_dof.at(idof);
-                slip.at(2 * inode) = particle.at(2 * idof);
-                slip.at(2 * inode + 1) = particle.at(2 * idof + 1);
-            }
-            for (int i = 0; i < slip.size(); i++) {
-                ofs << slip.at(i) << " ";
-            }
-            ofs << likelihood_ls.at(iparticle);
-            ofs << std::endl;
-        }
-        iter++;
+        // std::ofstream ofs(output_dir + std::to_string(iter) + ".csv");
+        // for (int iparticle = 0; iparticle < nparticle; iparticle++) {
+        //     const std::vector<double> particle = particles.at(iparticle);
+        //     std::vector<double> slip(lmat.size());
+        //     for (int idof = 0; idof < id_dof.size(); idof++) {
+        //         int inode = id_dof.at(idof);
+        //         slip.at(2 * inode) = particle.at(2 * idof);
+        //         slip.at(2 * inode + 1) = particle.at(2 * idof + 1);
+        //     }
+        //     for (int i = 0; i < slip.size(); i++) {
+        //         ofs << slip.at(i) << " ";
+        //     }
+        //     ofs << likelihood_ls.at(iparticle);
+        //     ofs << std::endl;
+        // }
+        // iter++;
     }
 
     // product of S_j (sum for negative log value)
