@@ -337,13 +337,11 @@ void resample_particles(
             for (int idim = 0; idim < ndim; idim++) {
                 rand.at(idim) = dist_stnorm(engine);
             }
+            cblas_dtrmv(CblasRowMajor, CblasLower, CblasNoTrans, CblasNonUnit,
+                        ndim, cov_flat, ndim, &rand[0], 1);
             std::vector<double> particle_cand(ndim);
             for (int idim = 0; idim < ndim; idim++) {
-                particle_cand[idim] = particle_cur[idim];
-                for (int jdim = 0; jdim < idim + 1; jdim++) {
-                    particle_cand[idim] +=
-                        cov_flat[idim * ndim + jdim] * rand[jdim];
-                }
+                particle_cand[idim] = particle_cur[idim] + rand[idim];
                 // non negative constraints
                 particle_cand[idim] = fmax(0, particle_cand[idim]);
             }
