@@ -20,7 +20,7 @@ double calc_likelihood(
     const std::unordered_map<int, std::vector<int>> &node_to_elem,
     const std::vector<int> &id_dof, const int &nsar, const int &ngnss,
     const std::vector<int> &lmat_index, const std::vector<double> &lmat_val,
-    const std::vector<std::vector<double>> &llmat);
+    const std::vector<std::vector<double>> &llmat, const int nparticle_slip);
 
 std::vector<std::vector<double>> gen_init_particles(
     const int &nparticle, const std::vector<std::vector<double>> &range,
@@ -35,7 +35,7 @@ std::vector<std::vector<double>> gen_init_particles(
     const std::vector<int> &id_dof, const std::vector<int> &lmat_index,
     const std::vector<double> &lmat_val,
     const std::vector<std::vector<double>> &llmat, const int &nsar,
-    const int &ngnss);
+    const int &ngnss, const int &nparticle_slip);
 
 std::vector<double> calc_mean_std_vector(const std::vector<double> &vec);
 
@@ -67,7 +67,7 @@ void resample_particles_parallel(
     const std::vector<int> &id_dof, const std::vector<int> &lmat_index,
     const std::vector<double> &lmat_val,
     const std::vector<std::vector<double>> &llmat, const int &nsar,
-    const int &ngnss);
+    const int &ngnss, const int &nparticle_slip);
 
 void smc_exec(std::vector<std::vector<double>> &particles,
               const std::string &output_dir,
@@ -84,5 +84,5 @@ void smc_exec(std::vector<std::vector<double>> &particles,
               const std::vector<int> &lmat_index,
               const std::vector<double> &lmat_val,
               const std::vector<std::vector<double>> &llmat, const int &nsar,
-              const int &ngnss);
+              const int &ngnss, const int &nparticle_slip);
 }  // namespace smc_fault

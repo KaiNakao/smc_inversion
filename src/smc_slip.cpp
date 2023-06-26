@@ -261,8 +261,8 @@ void resample_particles(
     const double &log_sigma_gnss2, const int &nsar, const int &ngnss,
     const double &log_alpha2, const std::vector<int> &lmat_index,
     const std::vector<double> &lmat_val) {
-    // std::random_device seed_gen;
-    std::mt19937 engine(12345);
+    std::random_device seed_gen;
+    std::mt19937 engine(seed_gen());
     // probability distribution for MCCMC metropolis test
     std::uniform_real_distribution<> dist_metropolis(0., 1.);
     // standard normal distribution
@@ -457,11 +457,11 @@ double smc_exec(std::vector<std::vector<double>> &particles,
                            gmat_flat, log_sigma_sar2, log_sigma_gnss2, nsar,
                            ngnss, log_alpha2, lmat_index, lmat_val);
 
-        // output result of stage j (disabled)
+        // output result of stage j(disabled)
         // std::ofstream ofs(output_dir + std::to_string(iter) + ".csv");
         // for (int iparticle = 0; iparticle < nparticle; iparticle++) {
         //     const std::vector<double> particle = particles.at(iparticle);
-        //     std::vector<double> slip(lmat.size());
+        //     std::vector<double> slip(lmat_index.size() / 5);
         //     for (int idof = 0; idof < id_dof.size(); idof++) {
         //         int inode = id_dof.at(idof);
         //         slip.at(2 * inode) = particle.at(2 * idof);
@@ -470,15 +470,36 @@ double smc_exec(std::vector<std::vector<double>> &particles,
         //     for (int i = 0; i < slip.size(); i++) {
         //         ofs << slip.at(i) << " ";
         //     }
-        //     ofs << likelihood_ls.at(iparticle);
+        //     ofs << likelihood_ls.at(iparticle) + prior_ls.at(iparticle);
         //     ofs << std::endl;
         // }
-        // iter++;
+        iter++;
+    }
+    std::ofstream ofs(output_dir + std::to_string(iter) + ".csv");
+    for (int iparticle = 0; iparticle < nparticle; iparticle++) {
+        const std::vector<double> particle = particles.at(iparticle);
+        std::vector<double> slip(lmat_index.size() / 5);
+        for (int idof = 0; idof < id_dof.size(); idof++) {
+            int inode = id_dof.at(idof);
+            slip.at(2 * inode) = particle.at(2 * idof);
+            slip.at(2 * inode + 1) = particle.at(2 * idof + 1);
+        }
+        for (int i = 0; i < slip.size(); i++) {
+            ofs << slip.at(i) << " ";
+        }
+        ofs << likelihood_ls.at(iparticle) + prior_ls.at(iparticle);
+        // ofs << std::endl;
+        ofs << " ";
+        double delta_norm = 0.;
+        calc_likelihood(particle, dvec, obs_sigma, sigma2_full, gmat_flat,
+                        log_sigma_sar2, log_sigma_gnss2, nsar, ngnss,
+                        delta_norm);
+        ofs << delta_norm << std::endl;
     }
 
     // product of S_j (sum for negative log value)
     double neglog_sum = 0.;
-    for (int i = 0; i < neglog_evidence_vec.size() - 1; i++) {
+    for (int i = 0; i < neglog_evidence_vec.size(); i++) {
         neglog_sum += neglog_evidence_vec.at(i);
     }
     neglog_sum = fmin(pow(10, 10), neglog_sum);

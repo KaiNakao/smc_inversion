@@ -32,4 +32,18 @@ std::vector<std::vector<double>> calc_ll(
 void gen_sparse_lmat(const std::vector<std::vector<double>> &lmat,
                      std::vector<int> &lmat_index,
                      std::vector<double> &lmat_val);
+
+void read_observation_cv_train(const int &nfold, const int &cv_id,
+                               std::vector<std::vector<double>> &obs_points,
+                               std::vector<std::vector<double>> &obs_unitvec,
+                               std::vector<double> &obs_sigma,
+                               std::vector<double> &dvec, int &nsar,
+                               int &ngnss);
+
+void read_observation_cv_valid(const int &nfold, const int &cv_id,
+                               std::vector<std::vector<double>> &obs_points,
+                               std::vector<std::vector<double>> &obs_unitvec,
+                               std::vector<double> &obs_sigma,
+                               std::vector<double> &dvec, int &nsar,
+                               int &ngnss);
 }  // namespace init

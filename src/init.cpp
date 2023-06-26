@@ -157,4 +157,157 @@ void gen_sparse_lmat(const std::vector<std::vector<double>> &lmat,
         }
     }
 }
+
+void read_observation_cv_train(const int &nfold, const int &cv_id,
+                               std::vector<std::vector<double>> &obs_points,
+                               std::vector<std::vector<double>> &obs_unitvec,
+                               std::vector<double> &obs_sigma,
+                               std::vector<double> &dvec, int &nsar,
+                               int &ngnss) {
+    nsar = 0;
+    ngnss = 0;
+
+    std::vector<std::vector<double>> obs_points_sar;
+    std::vector<std::vector<double>> obs_unitvec_sar;
+    std::vector<double> obs_sigma_sar;
+    std::vector<double> dvec_sar;
+
+    std::vector<std::vector<double>> obs_points_gnss;
+    std::vector<std::vector<double>> obs_unitvec_gnss;
+    std::vector<double> obs_sigma_gnss;
+    std::vector<double> dvec_gnss;
+
+    std::vector<int> train_batch_vec;
+    for (int i = 0; i < nfold; i++) {
+        if (i == cv_id) {
+            continue;
+        }
+        train_batch_vec.push_back(i);
+    }
+
+    for (int batch_id : train_batch_vec) {
+        std::string filename =
+            "input_cv/observation_cv_" + std::to_string(batch_id) + ".csv";
+        std::ifstream ifs(filename);
+        std::string record;
+        getline(ifs, record);  // header
+        while (getline(ifs, record)) {
+            std::vector<double> row;  // row = [x,y,ex,ey,ez,dlos,sigma,type]
+            std::istringstream iss(record);
+            for (int i = 0; i < 7; i++) {
+                getline(iss, record, ',');
+                row.push_back(std::stod(record));
+            }
+            getline(iss, record, ',');
+            std::string type = record;
+            if (type == "sar") {
+                nsar++;
+                obs_points_sar.push_back({row.at(0), row.at(1)});
+                obs_unitvec_sar.push_back({row.at(2), row.at(3), row.at(4)});
+                dvec_sar.push_back(row.at(5));
+                obs_sigma_sar.push_back(row.at(6));
+            }
+            if (type == "gnss") {
+                ngnss++;
+                obs_points_gnss.push_back({row.at(0), row.at(1)});
+                obs_unitvec_gnss.push_back({row.at(2), row.at(3), row.at(4)});
+                dvec_gnss.push_back(row.at(5));
+                obs_sigma_gnss.push_back(row.at(6));
+            }
+        }
+    }
+
+    obs_points.resize(0);
+    obs_unitvec.resize(0);
+    dvec.resize(0);
+    obs_sigma.resize(0);
+
+    for (int i = 0; i < nsar; i++) {
+        obs_points.push_back(obs_points_sar.at(i));
+        obs_unitvec.push_back(obs_unitvec_sar.at(i));
+        dvec.push_back(dvec_sar.at(i));
+        obs_sigma.push_back(obs_sigma_sar.at(i));
+    }
+
+    for (int i = 0; i < ngnss; i++) {
+        obs_points.push_back(obs_points_gnss.at(i));
+        obs_unitvec.push_back(obs_unitvec_gnss.at(i));
+        dvec.push_back(dvec_gnss.at(i));
+        obs_sigma.push_back(obs_sigma_gnss.at(i));
+    }
+    ngnss /= 3;
+}
+
+void read_observation_cv_valid(const int &nfold, const int &cv_id,
+                               std::vector<std::vector<double>> &obs_points,
+                               std::vector<std::vector<double>> &obs_unitvec,
+                               std::vector<double> &obs_sigma,
+                               std::vector<double> &dvec, int &nsar,
+                               int &ngnss) {
+    nsar = 0;
+    ngnss = 0;
+
+    std::vector<std::vector<double>> obs_points_sar;
+    std::vector<std::vector<double>> obs_unitvec_sar;
+    std::vector<double> obs_sigma_sar;
+    std::vector<double> dvec_sar;
+
+    std::vector<std::vector<double>> obs_points_gnss;
+    std::vector<std::vector<double>> obs_unitvec_gnss;
+    std::vector<double> obs_sigma_gnss;
+    std::vector<double> dvec_gnss;
+
+    std::vector<int> valid_batch_vec = {cv_id};
+    for (int batch_id : valid_batch_vec) {
+        std::string filename =
+            "input_cv/observation_cv_" + std::to_string(batch_id) + ".csv";
+        std::ifstream ifs(filename);
+        std::string record;
+        getline(ifs, record);  // header
+        while (getline(ifs, record)) {
+            std::vector<double> row;  // row = [x,y,ex,ey,ez,dlos,sigma,type]
+            std::istringstream iss(record);
+            for (int i = 0; i < 7; i++) {
+                getline(iss, record, ',');
+                row.push_back(std::stod(record));
+            }
+            getline(iss, record, ',');
+            std::string type = record;
+            if (type == "sar") {
+                nsar++;
+                obs_points_sar.push_back({row.at(0), row.at(1)});
+                obs_unitvec_sar.push_back({row.at(2), row.at(3), row.at(4)});
+                dvec_sar.push_back(row.at(5));
+                obs_sigma_sar.push_back(row.at(6));
+            }
+            if (type == "gnss") {
+                ngnss++;
+                obs_points_gnss.push_back({row.at(0), row.at(1)});
+                obs_unitvec_gnss.push_back({row.at(2), row.at(3), row.at(4)});
+                dvec_gnss.push_back(row.at(5));
+                obs_sigma_gnss.push_back(row.at(6));
+            }
+        }
+    }
+
+    obs_points.resize(0);
+    obs_unitvec.resize(0);
+    dvec.resize(0);
+    obs_sigma.resize(0);
+
+    for (int i = 0; i < nsar; i++) {
+        obs_points.push_back(obs_points_sar.at(i));
+        obs_unitvec.push_back(obs_unitvec_sar.at(i));
+        dvec.push_back(dvec_sar.at(i));
+        obs_sigma.push_back(obs_sigma_sar.at(i));
+    }
+
+    for (int i = 0; i < ngnss; i++) {
+        obs_points.push_back(obs_points_gnss.at(i));
+        obs_unitvec.push_back(obs_unitvec_gnss.at(i));
+        dvec.push_back(dvec_gnss.at(i));
+        obs_sigma.push_back(obs_sigma_gnss.at(i));
+    }
+    ngnss /= 3;
+}
 }  // namespace init
