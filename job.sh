@@ -1,9 +1,9 @@
 #!/bin/sh
-#PBS -q calc-lm
-#PBS -l ncpus=192
-#PBS -N smc_inv
+#PBS -q calc
+#PBS -l select=5:ncpus=80:mpiprocs=80
+#PBS -N smc_inv_mpi
 
 cd /home/nakao/smc_inversion
 make main
-./main 15 15 > 15_15_all_slip.log
+mpiexec -n 400 ./main 20 20 > mpi.log
 

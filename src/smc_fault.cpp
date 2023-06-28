@@ -57,8 +57,8 @@ void sample_init_particles(std::vector<double> &particles_flat,
 
     // probability distribution instance for generating samples from piror
     // (uniform distribution)
-    std::random_device seed_gen;
-    std::mt19937 engine(seed_gen());
+    // std::random_device seed_gen;
+    std::mt19937 engine(12345);
     std::vector<std::uniform_real_distribution<>> dist_vec(range.size());
     for (int idim = 0; idim < range.size(); idim++) {
         std::uniform_real_distribution<> dist(range.at(idim).at(0),
@@ -67,7 +67,7 @@ void sample_init_particles(std::vector<double> &particles_flat,
     }
 
     for (int iparticle = 0; iparticle < nparticle; iparticle++) {
-        for (int idim = 0; idim < range.size(); idim++) {
+        for (int idim = 0; idim < ndim; idim++) {
             double x = dist_vec.at(idim)(engine);
             particles_flat.at(iparticle * ndim + idim) = x;
         }
@@ -100,9 +100,9 @@ void work_eval_init_particles(
             particle, cny_fault, coor_fault, dvec, obs_points, obs_unitvec,
             obs_sigma, leta, node_to_elem, id_dof, nsar, ngnss, lmat_index,
             lmat_val, llmat, nparticle_slip);
-        std::cout << "iparticle: " << iparticle + myid * work_size
-                  << " likelihood: " << work_init_likelihood.at(iparticle)
-                  << std::endl;
+        // std::cout << "iparticle: " << iparticle + myid * work_size
+        //           << " likelihood: " << work_init_likelihood.at(iparticle)
+        //           << std::endl;
     }
 }
 
@@ -125,8 +125,8 @@ std::vector<std::vector<double>> gen_init_particles(
 
     // probability distribution instance for generating samples from piror
     // (uniform distribution)
-    std::random_device seed_gen;
-    std::mt19937 engine(seed_gen());
+    // std::random_device seed_gen;
+    std::mt19937 engine(12345);
     std::vector<std::uniform_real_distribution<>> dist_vec(range.size());
     for (int idim = 0; idim < range.size(); idim++) {
         std::uniform_real_distribution<> dist(range.at(idim).at(0),
@@ -150,9 +150,9 @@ std::vector<std::vector<double>> gen_init_particles(
             particle, cny_fault, coor_fault, dvec, obs_points, obs_unitvec,
             obs_sigma, leta, node_to_elem, id_dof, nsar, ngnss, lmat_index,
             lmat_val, llmat, nparticle_slip);
-        std::cout << "iparticle: " << iparticle
-                  << " likelihood: " << likelihood_ls.at(iparticle)
-                  << std::endl;
+        // std::cout << "iparticle: " << iparticle
+        //           << " likelihood: " << likelihood_ls.at(iparticle)
+        //           << std::endl;
     }
     return particles;
 }  // namespace smc_fault
@@ -271,16 +271,19 @@ std::vector<double> calc_cov_particles(
             }
         }
     }
-    for (int idim = 0; idim < ndim; idim++) {
-        for (int jdim = 0; jdim < ndim; jdim++) {
-            cov_flat[idim * ndim + jdim] *= 0.04;
-        }
-    }
     std::cout << "cov:" << std::endl;
     for (int i = 0; i < ndim; i++) {
         std::cout << cov_flat.at(i * ndim + i) << " ";
     }
     std::cout << std::endl;
+    for (int idim = 0; idim < ndim; idim++) {
+        for (int jdim = 0; jdim < ndim; jdim++) {
+            cov_flat[idim * ndim + jdim] *= 0.04;
+        }
+    }
+
+    // LAPACK function for LU decomposition of matrix
+    LAPACKE_dpotrf(LAPACK_ROW_MAJOR, 'L', ndim, &cov_flat[0], ndim);
     return cov_flat;
 }
 
@@ -291,7 +294,6 @@ std::vector<int> resample_particles(const int &nparticle,
 
     // resampling
     // list for the indice of original particle of each resampled particle
-    std::vector<double> resampled_idx(nparticle);
     double deno = nparticle;
     std::vector<double> uvec(nparticle);
     for (int n = 0; n < uvec.size(); n++) {
@@ -303,16 +305,12 @@ std::vector<int> resample_particles(const int &nparticle,
     for (int n = 0; n < nparticle - 1; n++) {
         cumsum.at(n + 1) = cumsum.at(n) + weights.at(n + 1);
     }
+    std::vector<int> assigned_num(nparticle, 0);
     for (int iparticle = 0; iparticle < nparticle; iparticle++) {
         auto it =
             std::lower_bound(cumsum.begin(), cumsum.end(), uvec.at(iparticle));
         int i = std::distance(cumsum.begin(), it);
-        resampled_idx.at(iparticle) = i;
-    }
-    std::vector<int> assigned_num(nparticle, 0);
-    for (int iparticle = 0; iparticle < nparticle; iparticle++) {
-        int jparticle = resampled_idx.at(iparticle);
-        (assigned_num[jparticle])++;
+        (assigned_num[i])++;
     }
     return assigned_num;
 }
@@ -415,13 +413,13 @@ void work_mcmc_sampling(
             if (particle_cand.at(4) < 90 && particle_cand.at(2) < 0 &&
                 particle_cand.at(7) < -2 &&
                 exp(gamma * (likelihood_cur - likelihood_cand)) > metropolis) {
-                std::cout << "accepted likelihood: " << likelihood_cand
-                          << std::endl;
+                // std::cout << "accepted likelihood: " << likelihood_cand
+                //           << std::endl;
                 particle_cur = particle_cand;
                 likelihood_cur = likelihood_cand;
             } else {
-                std::cout << "rejected likelihood: " << likelihood_cand
-                          << std::endl;
+                // std::cout << "rejected likelihood: " << likelihood_cand
+                //           << std::endl;
             }
 
             // save to new particle list
@@ -547,13 +545,13 @@ void resample_particles_parallel(
             if (particle_cand.at(4) < 90 && particle_cand.at(2) < 0 &&
                 particle_cand.at(7) < -2 &&
                 exp(gamma * (likelihood_cur - likelihood_cand)) > metropolis) {
-                std::cout << "accepted likelihood: " << likelihood_cand
-                          << std::endl;
+                // std::cout << "accepted likelihood: " << likelihood_cand
+                //           << std::endl;
                 particle_cur = particle_cand;
                 likelihood_cur = likelihood_cand;
             } else {
-                std::cout << "rejected likelihood: " << likelihood_cand
-                          << std::endl;
+                // std::cout << "rejected likelihood: " << likelihood_cand
+                //           << std::endl;
             }
 
             // save to new particle list
@@ -617,7 +615,7 @@ void smc_exec(std::vector<std::vector<double>> &particles,
         // output result of stage 0
         std::ofstream ofs(output_dir + std::to_string(0) + ".csv");
         for (int iparticle = 0; iparticle < nparticle; iparticle++) {
-            for (int idim = 0; idim < range.size(); idim++) {
+            for (int idim = 0; idim < ndim; idim++) {
                 ofs << particles_flat.at(iparticle * ndim + idim) << " ";
             }
             ofs << likelihood_ls.at(iparticle);
@@ -766,10 +764,6 @@ void smc_exec(std::vector<std::vector<double>> &particles,
             calc_mean_particles(particles_flat, weights_fin, nparticle, ndim);
         std::vector<double> cov_flat = calc_cov_particles(
             particles_flat, weights_fin, mean, nparticle, ndim);
-        for (int i = 0; i < ndim; i++) {
-            std::cout << cov_flat.at(i * ndim + i) / 0.04 << " ";
-        }
-        std::cout << std::endl;
     }
     return;
 }
