@@ -3,7 +3,7 @@
 #PBS -l ncpus=192
 #PBS -N smc_inv
 
-cd /home/nakao/smc_inversion
+cd /home/nakao/smc_inversion_omp
 make main
-./main 15 15 > 15_15_all_slip.log
+./main 20 20 > omp2.log
 

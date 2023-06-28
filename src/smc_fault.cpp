@@ -69,8 +69,8 @@ std::vector<std::vector<double>> gen_init_particles(
 
     // probability distribution instance for generating samples from piror
     // (uniform distribution)
-    // std::random_device seed_gen;
-    std::mt19937 engine(12345);
+    std::random_device seed_gen;
+    std::mt19937 engine(seed_gen());
     std::vector<std::uniform_real_distribution<>> dist_vec(range.size());
     for (int idim = 0; idim < range.size(); idim++) {
         std::uniform_real_distribution<> dist(range.at(idim).at(0),
@@ -98,9 +98,9 @@ std::vector<std::vector<double>> gen_init_particles(
             particle, cny_fault, coor_fault, dvec, obs_points, obs_unitvec,
             obs_sigma, leta, node_to_elem, id_dof, nsar, ngnss, lmat_index,
             lmat_val, llmat, nparticle_slip);
-        std::cout << "iparticle: " << iparticle
-                  << " likelihood: " << likelihood_ls.at(iparticle)
-                  << std::endl;
+        // std::cout << "iparticle: " << iparticle
+        //           << " likelihood: " << likelihood_ls.at(iparticle)
+        //           << std::endl;
     }
     return particles;
 }  // namespace smc_fault
@@ -221,16 +221,16 @@ std::vector<double> calc_cov_particles(
             }
         }
     }
-    for (int idim = 0; idim < ndim; idim++) {
-        for (int jdim = 0; jdim < ndim; jdim++) {
-            cov_flat[idim * ndim + jdim] *= 0.04;
-        }
-    }
     std::cout << "cov:" << std::endl;
     for (int i = 0; i < ndim; i++) {
         std::cout << cov_flat.at(i * ndim + i) << " ";
     }
     std::cout << std::endl;
+    for (int idim = 0; idim < ndim; idim++) {
+        for (int jdim = 0; jdim < ndim; jdim++) {
+            cov_flat[idim * ndim + jdim] *= 0.04;
+        }
+    }
     return cov_flat;
 }
 
@@ -249,8 +249,8 @@ void resample_particles_parallel(
     const std::vector<double> &lmat_val,
     const std::vector<std::vector<double>> &llmat, const int &nsar,
     const int &ngnss, const int &nparticle_slip) {
-    // std::random_device seed_gen;
-    std::mt19937 engine(12345);
+    std::random_device seed_gen;
+    std::mt19937 engine(seed_gen());
     // probability distribution for MCCMC metropolis test
     std::uniform_real_distribution<> dist_metropolis(0., 1.);
     // standard normal distribution
@@ -345,13 +345,13 @@ void resample_particles_parallel(
             if (particle_cand.at(4) < 90 && particle_cand.at(2) < 0 &&
                 particle_cand.at(7) < -2 &&
                 exp(gamma * (likelihood_cur - likelihood_cand)) > metropolis) {
-                std::cout << "accepted likelihood: " << likelihood_cand
-                          << std::endl;
+                // std::cout << "accepted likelihood: " << likelihood_cand
+                //           << std::endl;
                 particle_cur = particle_cand;
                 likelihood_cur = likelihood_cand;
             } else {
-                std::cout << "rejected likelihood: " << likelihood_cand
-                          << std::endl;
+                // std::cout << "rejected likelihood: " << likelihood_cand
+                //           << std::endl;
             }
 
             // save to new particle list
@@ -468,10 +468,6 @@ void smc_exec(std::vector<std::vector<double>> &particles,
     std::vector<double> mean = calc_mean_particles(particles, weights_fin);
     std::vector<double> cov_flat =
         calc_cov_particles(particles, weights_fin, mean);
-    for (int i = 0; i < ndim; i++) {
-        std::cout << cov_flat.at(i * ndim + i) / 0.04 << " ";
-    }
-    std::cout << std::endl;
     return;
 }
 }  // namespace smc_fault
