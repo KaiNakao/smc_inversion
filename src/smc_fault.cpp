@@ -50,6 +50,62 @@ double calc_likelihood(
     return neglog;
 }
 
+void sample_init_particles(std::vector<double> &particles_flat,
+                           const int &nparticle, const int &ndim,
+                           const std::vector<std::vector<double>> &range) {
+    particles_flat.resize(nparticle * ndim);
+
+    // probability distribution instance for generating samples from piror
+    // (uniform distribution)
+    std::random_device seed_gen;
+    std::mt19937 engine(seed_gen());
+    std::vector<std::uniform_real_distribution<>> dist_vec(range.size());
+    for (int idim = 0; idim < range.size(); idim++) {
+        std::uniform_real_distribution<> dist(range.at(idim).at(0),
+                                              range.at(idim).at(1));
+        dist_vec.at(idim) = dist;
+    }
+
+    for (int iparticle = 0; iparticle < nparticle; iparticle++) {
+        for (int idim = 0; idim < range.size(); idim++) {
+            double x = dist_vec.at(idim)(engine);
+            particles_flat.at(iparticle * ndim + idim) = x;
+        }
+    }
+    return;
+}
+
+void work_eval_init_particles(
+    const int &work_size, const int &ndim,
+    const std::vector<double> &work_particles_flat,
+    std::vector<double> &work_init_likelihood,
+    const std::vector<std::vector<int>> &cny_fault,
+    const std::vector<std::vector<double>> &coor_fault,
+    const std::vector<std::vector<double>> &obs_points,
+    const std::vector<double> &dvec,
+    const std::vector<std::vector<double>> &obs_unitvec,
+    const std::vector<double> &obs_sigma, const double &leta,
+    const std::unordered_map<int, std::vector<int>> &node_to_elem,
+    const std::vector<int> &id_dof, const std::vector<int> &lmat_index,
+    const std::vector<double> &lmat_val,
+    const std::vector<std::vector<double>> &llmat, const int &nsar,
+    const int &ngnss, const int &nparticle_slip, const int &myid) {
+    for (int iparticle = 0; iparticle < work_size; iparticle++) {
+        std::vector<double> particle(ndim);
+        for (int idim = 0; idim < ndim; idim++) {
+            particle.at(idim) = work_particles_flat.at(iparticle * ndim + idim);
+        }
+        // calculate negative log likelihood for the sample
+        work_init_likelihood.at(iparticle) = calc_likelihood(
+            particle, cny_fault, coor_fault, dvec, obs_points, obs_unitvec,
+            obs_sigma, leta, node_to_elem, id_dof, nsar, ngnss, lmat_index,
+            lmat_val, llmat, nparticle_slip);
+        std::cout << "iparticle: " << iparticle + myid * work_size
+                  << " likelihood: " << work_init_likelihood.at(iparticle)
+                  << std::endl;
+    }
+}
+
 std::vector<std::vector<double>> gen_init_particles(
     const int &nparticle, const std::vector<std::vector<double>> &range,
     std::vector<double> &likelihood_ls,
@@ -69,8 +125,8 @@ std::vector<std::vector<double>> gen_init_particles(
 
     // probability distribution instance for generating samples from piror
     // (uniform distribution)
-    // std::random_device seed_gen;
-    std::mt19937 engine(12345);
+    std::random_device seed_gen;
+    std::mt19937 engine(seed_gen());
     std::vector<std::uniform_real_distribution<>> dist_vec(range.size());
     for (int idim = 0; idim < range.size(); idim++) {
         std::uniform_real_distribution<> dist(range.at(idim).at(0),
@@ -81,16 +137,12 @@ std::vector<std::vector<double>> gen_init_particles(
     // samples to return
     std::vector<std::vector<double>> particles(nparticle,
                                                std::vector<double>(ndim));
-#pragma omp parallel for schedule(dynamic)
     for (int iparticle = 0; iparticle < nparticle; iparticle++) {
         // sampling
         std::vector<double> particle(ndim);
-#pragma omp critical
-        {
-            for (int idim = 0; idim < range.size(); idim++) {
-                double x = dist_vec.at(idim)(engine);
-                particle.at(idim) = x;
-            }
+        for (int idim = 0; idim < range.size(); idim++) {
+            double x = dist_vec.at(idim)(engine);
+            particle.at(idim) = x;
         }
         particles.at(iparticle) = particle;
         // calculate negative log likelihood for the sample
@@ -185,15 +237,13 @@ std::vector<double> normalize_weights(const std::vector<double> &weights) {
 }
 
 std::vector<double> calc_mean_particles(
-    const std::vector<std::vector<double>> &particles,
-    const std::vector<double> &weights) {
-    int n_particle = particles.size();
-    int ndim = particles.at(0).size();
+    const std::vector<double> &particles_flat,
+    const std::vector<double> &weights, const int &nparticle, const int &ndim) {
     std::vector<double> mean(ndim);
-    for (int iparticle = 0; iparticle < n_particle; iparticle++) {
+    for (int iparticle = 0; iparticle < nparticle; iparticle++) {
         for (int idim = 0; idim < ndim; idim++) {
-            mean.at(idim) +=
-                weights.at(iparticle) * particles.at(iparticle).at(idim);
+            mean.at(idim) += weights.at(iparticle) *
+                             particles_flat.at(iparticle * ndim + idim);
         }
     }
     std::cout << "mean:" << std::endl;
@@ -205,19 +255,19 @@ std::vector<double> calc_mean_particles(
 }
 
 std::vector<double> calc_cov_particles(
-    const std::vector<std::vector<double>> &particles,
-    const std::vector<double> &weights, const std::vector<double> &mean) {
-    int n_particle = particles.size();
-    int ndim = particles.at(0).size();
-    // std::vector<std::vector<double>> cov(ndim, std::vector<double>(ndim));
+    const std::vector<double> &particles_flat,
+    const std::vector<double> &weights, const std::vector<double> &mean,
+    const int &nparticle, const int &ndim) {
     std::vector<double> cov_flat(ndim * ndim);
-    for (int iparticle = 0; iparticle < n_particle; iparticle++) {
+    for (int iparticle = 0; iparticle < nparticle; iparticle++) {
         for (int idim = 0; idim < ndim; idim++) {
             for (int jdim = 0; jdim < ndim; jdim++) {
                 cov_flat.at(idim * ndim + jdim) +=
                     weights.at(iparticle) *
-                    (particles.at(iparticle).at(idim) - mean.at(idim)) *
-                    (particles.at(iparticle).at(jdim) - mean.at(jdim));
+                    (particles_flat.at(iparticle * ndim + idim) -
+                     mean.at(idim)) *
+                    (particles_flat.at(iparticle * ndim + jdim) -
+                     mean.at(jdim));
             }
         }
     }
@@ -232,6 +282,157 @@ std::vector<double> calc_cov_particles(
     }
     std::cout << std::endl;
     return cov_flat;
+}
+
+std::vector<int> resample_particles(const int &nparticle,
+                                    const std::vector<double> &weights) {
+    // std::random_device seed_gen;
+    std::mt19937 engine(12345);
+
+    // resampling
+    // list for the indice of original particle of each resampled particle
+    std::vector<double> resampled_idx(nparticle);
+    double deno = nparticle;
+    std::vector<double> uvec(nparticle);
+    for (int n = 0; n < uvec.size(); n++) {
+        std::uniform_real_distribution<> dist1(n / deno, (n + 1) / deno);
+        uvec.at(n) = dist1(engine);
+    }
+    std::vector<double> cumsum(nparticle);
+    cumsum.at(0) = weights.at(0);
+    for (int n = 0; n < nparticle - 1; n++) {
+        cumsum.at(n + 1) = cumsum.at(n) + weights.at(n + 1);
+    }
+    for (int iparticle = 0; iparticle < nparticle; iparticle++) {
+        auto it =
+            std::lower_bound(cumsum.begin(), cumsum.end(), uvec.at(iparticle));
+        int i = std::distance(cumsum.begin(), it);
+        resampled_idx.at(iparticle) = i;
+    }
+    std::vector<int> assigned_num(nparticle, 0);
+    for (int iparticle = 0; iparticle < nparticle; iparticle++) {
+        int jparticle = resampled_idx.at(iparticle);
+        (assigned_num[jparticle])++;
+    }
+    return assigned_num;
+}
+
+void reorder_to_send(std::vector<int> &assigned_num,
+                     std::vector<double> &particles_flat, const int &nparticle,
+                     const int &ndim, const int &numprocs,
+                     const int &work_size) {
+    std::vector<int> sorted_idx(nparticle);
+    std::iota(sorted_idx.begin(), sorted_idx.end(), 0);
+    std::sort(sorted_idx.begin(), sorted_idx.end(), [&](int a, int b) {
+        return assigned_num.at(a) > assigned_num.at(b);
+    });
+
+    std::vector<double> tmp_particles_flat = particles_flat;
+    std::vector<int> tmp_assigned_num = assigned_num;
+    for (int iproc = 0; iproc < numprocs; iproc++) {
+        for (int iparticle = 0; iparticle < work_size; iparticle++) {
+            int id_org = sorted_idx.at(iparticle * numprocs + iproc);
+            int id_new = iproc * work_size + iparticle;
+            assigned_num.at(id_new) = tmp_assigned_num.at(id_org);
+            for (int idim = 0; idim < ndim; idim++) {
+                particles_flat.at(id_new * ndim + idim) =
+                    tmp_particles_flat.at(id_org * ndim + idim);
+            }
+        }
+    }
+    return;
+}
+
+void work_mcmc_sampling(
+    const std::vector<int> &work_assigned_num,
+    const std::vector<double> &work_particles_flat,
+    std::vector<double> &work_particles_flat_new,
+    std::vector<double> &work_likelihood_ls_new, const int &work_size,
+    const int &ndim, const std::vector<double> &cov_flat, const double &gamma,
+    const std::vector<std::vector<int>> &cny_fault,
+    const std::vector<std::vector<double>> &coor_fault,
+    const std::vector<std::vector<double>> &obs_points,
+    const std::vector<double> &dvec,
+    const std::vector<std::vector<double>> &obs_unitvec,
+    const std::vector<double> &obs_sigma, const double &leta,
+    const std::unordered_map<int, std::vector<int>> &node_to_elem,
+    const std::vector<int> &id_dof, const std::vector<int> &lmat_index,
+    const std::vector<double> &lmat_val,
+    const std::vector<std::vector<double>> &llmat, const int &nsar,
+    const int &ngnss, const int &nparticle_slip, const int &myid) {
+    // std::random_device seed_gen;
+    std::mt19937 engine(12345);
+    // probability distribution for MCCMC metropolis test
+    std::uniform_real_distribution<> dist_metropolis(0., 1.);
+    // standard normal distribution
+    std::normal_distribution<> dist_stnorm(0., 1.);
+
+    std::vector<int> id_start(work_size);
+    for (int iparticle = 0; iparticle < work_size - 1; iparticle++) {
+        id_start.at(iparticle + 1) =
+            id_start.at(iparticle) + work_assigned_num.at(iparticle);
+    }
+    int sum_assigned =
+        id_start.at(work_size - 1) + work_assigned_num.at(work_size - 1);
+    work_particles_flat_new.resize(sum_assigned * ndim);
+    work_likelihood_ls_new.resize(sum_assigned);
+    for (int iparticle = 0; iparticle < work_size; iparticle++) {
+        int nassigned = work_assigned_num.at(iparticle);
+        int istart = id_start.at(iparticle);
+        std::vector<double> particle_cur(ndim);
+        for (int idim = 0; idim < ndim; idim++) {
+            particle_cur.at(idim) =
+                work_particles_flat.at(iparticle * ndim + idim);
+        }
+        for (int jparticle = 0; jparticle < nassigned; jparticle++) {
+            double likelihood_cur = calc_likelihood(
+                particle_cur, cny_fault, coor_fault, dvec, obs_points,
+                obs_unitvec, obs_sigma, leta, node_to_elem, id_dof, nsar, ngnss,
+                lmat_index, lmat_val, llmat, nparticle_slip);
+            // propose particle_cand
+            std::vector<double> rand(ndim);
+            for (int idim = 0; idim < ndim; idim++) {
+                rand.at(idim) = dist_stnorm(engine);
+            }
+            std::vector<double> particle_cand(ndim);
+            for (int idim = 0; idim < ndim; idim++) {
+                particle_cand[idim] = particle_cur[idim];
+                for (int jdim = 0; jdim < idim + 1; jdim++) {
+                    particle_cand[idim] +=
+                        cov_flat[idim * ndim + jdim] * rand[jdim];
+                }
+            }
+
+            // calculate negative log likelihood of the proposed
+            // configuration
+            double likelihood_cand = calc_likelihood(
+                particle_cand, cny_fault, coor_fault, dvec, obs_points,
+                obs_unitvec, obs_sigma, leta, node_to_elem, id_dof, nsar, ngnss,
+                lmat_index, lmat_val, llmat, nparticle_slip);
+            double metropolis = dist_metropolis(engine);
+
+            // metropolis test and check domain of definition
+            if (particle_cand.at(4) < 90 && particle_cand.at(2) < 0 &&
+                particle_cand.at(7) < -2 &&
+                exp(gamma * (likelihood_cur - likelihood_cand)) > metropolis) {
+                std::cout << "accepted likelihood: " << likelihood_cand
+                          << std::endl;
+                particle_cur = particle_cand;
+                likelihood_cur = likelihood_cand;
+            } else {
+                std::cout << "rejected likelihood: " << likelihood_cand
+                          << std::endl;
+            }
+
+            // save to new particle list
+            work_likelihood_ls_new.at(istart + jparticle) = likelihood_cur;
+            for (int idim = 0; idim < ndim; idim++) {
+                work_particles_flat_new.at((istart + jparticle) * ndim + idim) =
+                    particle_cur.at(idim);
+            }
+        }
+    }
+    return;
 }
 
 void resample_particles_parallel(
@@ -334,7 +535,8 @@ void resample_particles_parallel(
                 }
             }
 
-            // calculate negative log likelihood of the proposed configuration
+            // calculate negative log likelihood of the proposed
+            // configuration
             double likelihood_cand = calc_likelihood(
                 particle_cand, cny_fault, coor_fault, dvec, obs_points,
                 obs_unitvec, obs_sigma, leta, node_to_elem, id_dof, nsar, ngnss,
@@ -385,62 +587,156 @@ void smc_exec(std::vector<std::vector<double>> &particles,
               const std::vector<int> &lmat_index,
               const std::vector<double> &lmat_val,
               const std::vector<std::vector<double>> &llmat, const int &nsar,
-              const int &ngnss, const int &nparticle_slip) {
+              const int &ngnss, const int &nparticle_slip, const int &myid,
+              const int &numprocs) {
+    MPI_Status status;
     const int ndim = range.size();
+    const int work_size = nparticle / numprocs;
     // list for (negative log) likelihood for each particles
-    std::vector<double> likelihood_ls(nparticle);
-    // sampling from the prior distribution
-    particles = gen_init_particles(
-        nparticle, range, likelihood_ls, cny_fault, coor_fault, obs_points,
-        dvec, obs_unitvec, obs_sigma, leta, node_to_elem, id_dof, lmat_index,
-        lmat_val, llmat, nsar, ngnss, nparticle_slip);
-
-    // output result of stage 0
-    std::ofstream ofs(output_dir + std::to_string(0) + ".csv");
-    for (int iparticle = 0; iparticle < nparticle; iparticle++) {
-        const std::vector<double> particle = particles.at(iparticle);
-        for (int idim = 0; idim < range.size(); idim++) {
-            ofs << particle.at(idim) << " ";
-        }
-        ofs << likelihood_ls.at(iparticle);
-        ofs << std::endl;
+    std::vector<double> likelihood_ls;
+    std::vector<double> particles_flat;
+    if (myid == 0) {
+        likelihood_ls.resize(nparticle);
+        // sampling from the prior distribution
+        sample_init_particles(particles_flat, nparticle, ndim, range);
     }
+    std::vector<double> work_particles_flat(work_size * ndim);
+    std::vector<double> work_init_likelihood(work_size);
+    MPI_Scatter(&particles_flat[0], work_size * ndim, MPI_DOUBLE,
+                &work_particles_flat.at(0), work_size * ndim, MPI_DOUBLE, 0,
+                MPI_COMM_WORLD);
+    work_eval_init_particles(work_size, ndim, work_particles_flat,
+                             work_init_likelihood, cny_fault, coor_fault,
+                             obs_points, dvec, obs_unitvec, obs_sigma, leta,
+                             node_to_elem, id_dof, lmat_index, lmat_val, llmat,
+                             nsar, ngnss, nparticle_slip, myid);
+    MPI_Gather(&work_init_likelihood.at(0), work_size, MPI_DOUBLE,
+               &likelihood_ls[0], work_size, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
-    // list for resampling weights
-    std::vector<double> weights(nparticle, 1.);
-    double gamma = 0.;
-    int iter = 1;
-    while (1. - gamma > pow(10, -8)) {
-        // find the gamma such that c.o.v of weights = 0.5
-        gamma = find_next_gamma(gamma, likelihood_ls, weights);
-        std::cout << "gamma: " << gamma << std::endl;
-
-        // normalize weights (sum of weights needs to be 1)
-        weights = normalize_weights(weights);
-
-        // calculate mean and covariance of the samples
-        std::vector<double> mean = calc_mean_particles(particles, weights);
-        std::vector<double> cov_flat =
-            calc_cov_particles(particles, weights, mean);
-
-        // resampling and MCMC sampling from the updated distribution
-        resample_particles_parallel(particles, weights, likelihood_ls, cov_flat,
-                                    gamma, cny_fault, coor_fault, obs_points,
-                                    dvec, obs_unitvec, obs_sigma, leta,
-                                    node_to_elem, id_dof, lmat_index, lmat_val,
-                                    llmat, nsar, ngnss, nparticle_slip);
-
-        // output result of stage j
-        std::ofstream ofs(output_dir + std::to_string(iter) + ".csv");
+    if (myid == 0) {
+        // output result of stage 0
+        std::ofstream ofs(output_dir + std::to_string(0) + ".csv");
         for (int iparticle = 0; iparticle < nparticle; iparticle++) {
-            const std::vector<double> particle = particles.at(iparticle);
             for (int idim = 0; idim < range.size(); idim++) {
-                ofs << particle.at(idim) << " ";
+                ofs << particles_flat.at(iparticle * ndim + idim) << " ";
             }
             ofs << likelihood_ls.at(iparticle);
             ofs << std::endl;
         }
-        iter++;
+    }
+
+    double gamma = 0.;
+    int iter = 1;
+    std::vector<double> cov_flat(ndim * ndim);
+    std::vector<int> assigned_num;
+    std::vector<int> work_assigned_num(work_size);
+    std::vector<double> work_particles_flat_new;
+    std::vector<double> work_likelihood_ls_new;
+    std::vector<int> sum_assigned_ls(numprocs);
+    std::vector<std::vector<double>> buf_likelihood(numprocs);
+    std::vector<std::vector<double>> buf_particles_flat(numprocs);
+    while (1. - gamma > pow(10, -8)) {
+        if (myid == 0) {
+            // list for resampling weights
+            std::vector<double> weights(nparticle, 1.);
+            // find the gamma such that c.o.v of weights = 0.5
+            gamma = find_next_gamma(gamma, likelihood_ls, weights);
+            std::cout << "gamma: " << gamma << std::endl;
+
+            // normalize weights (sum of weights needs to be 1)
+            weights = normalize_weights(weights);
+
+            // calculate mean and covariance of the samples
+            std::vector<double> mean =
+                calc_mean_particles(particles_flat, weights, nparticle, ndim);
+            cov_flat = calc_cov_particles(particles_flat, weights, mean,
+                                          nparticle, ndim);
+
+            assigned_num = resample_particles(nparticle, weights);
+
+            reorder_to_send(assigned_num, particles_flat, nparticle, ndim,
+                            numprocs, work_size);
+            for (int iproc = 0; iproc < numprocs; iproc++) {
+                int sum_assigned = 0;
+                for (int iparticle = iproc * work_size;
+                     iparticle < (iproc + 1) * work_size; iparticle++) {
+                    sum_assigned += assigned_num.at(iparticle);
+                }
+                sum_assigned_ls.at(iproc) = sum_assigned;
+                buf_likelihood.at(iproc).resize(sum_assigned);
+                buf_particles_flat.at(iproc).resize(sum_assigned * ndim);
+            }
+        }
+        MPI_Bcast(&gamma, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+        MPI_Bcast(&cov_flat[0], ndim * ndim, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+        MPI_Scatter(&particles_flat[0], work_size * ndim, MPI_DOUBLE,
+                    &work_particles_flat.at(0), work_size * ndim, MPI_DOUBLE, 0,
+                    MPI_COMM_WORLD);
+        MPI_Scatter(&assigned_num[0], work_size, MPI_INT,
+                    &work_assigned_num.at(0), work_size, MPI_INT, 0,
+                    MPI_COMM_WORLD);
+        work_mcmc_sampling(work_assigned_num, work_particles_flat,
+                           work_particles_flat_new, work_likelihood_ls_new,
+                           work_size, ndim, cov_flat, gamma, cny_fault,
+                           coor_fault, obs_points, dvec, obs_unitvec, obs_sigma,
+                           leta, node_to_elem, id_dof, lmat_index, lmat_val,
+                           llmat, nsar, ngnss, nparticle_slip, myid);
+        MPI_Barrier(MPI_COMM_WORLD);
+        if (myid == 0) {
+            for (int iproc = 1; iproc < numprocs; iproc++) {
+                MPI_Recv(&buf_likelihood.at(iproc).at(0),
+                         sum_assigned_ls.at(iproc), MPI_DOUBLE, iproc, 0,
+                         MPI_COMM_WORLD, &status);
+                MPI_Recv(&buf_particles_flat.at(iproc).at(0),
+                         sum_assigned_ls.at(iproc) * ndim, MPI_DOUBLE, iproc, 1,
+                         MPI_COMM_WORLD, &status);
+                // std::cout << "iproc: " << iproc << " recv size "
+                //           << sum_assigned_ls.at(iproc) << std::endl;
+            }
+            for (int iparticle = 0; iparticle < work_likelihood_ls_new.size();
+                 iparticle++) {
+                buf_likelihood.at(0).at(iparticle) =
+                    work_likelihood_ls_new.at(iparticle);
+                for (int idim = 0; idim < ndim; idim++) {
+                    buf_particles_flat.at(0).at(iparticle * ndim + idim) =
+                        work_particles_flat_new.at(iparticle * ndim + idim);
+                }
+            }
+            int cnt = 0;
+            for (int iproc = 0; iproc < numprocs; iproc++) {
+                int size = sum_assigned_ls.at(iproc);
+                for (int iparticle = 0; iparticle < size; iparticle++) {
+                    likelihood_ls.at(cnt) =
+                        buf_likelihood.at(iproc).at(iparticle);
+                    for (int idim = 0; idim < ndim; idim++) {
+                        particles_flat.at(cnt * ndim + idim) =
+                            buf_particles_flat.at(iproc).at(iparticle * ndim +
+                                                            idim);
+                    }
+                    cnt++;
+                }
+            }
+        } else {
+            int send_size = work_likelihood_ls_new.size();
+            MPI_Send(&work_likelihood_ls_new.at(0), send_size, MPI_DOUBLE, 0, 0,
+                     MPI_COMM_WORLD);
+            MPI_Send(&work_particles_flat_new.at(0), send_size * ndim,
+                     MPI_DOUBLE, 0, 1, MPI_COMM_WORLD);
+        }
+
+        if (myid == 0) {
+            // output result of stage j
+            std::ofstream ofs(output_dir + std::to_string(iter) + ".csv");
+            for (int iparticle = 0; iparticle < nparticle; iparticle++) {
+                for (int idim = 0; idim < range.size(); idim++) {
+                    ofs << particles_flat.at(iparticle * ndim + idim) << " ";
+                }
+                ofs << likelihood_ls.at(iparticle);
+                ofs << std::endl;
+            }
+            iter++;
+        }
+        MPI_Barrier(MPI_COMM_WORLD);
     }
 
     // // output MAP value
@@ -464,14 +760,17 @@ void smc_exec(std::vector<std::vector<double>> &particles,
     // ofs_map << std::endl;
 
     // calculate mean and covariance of the samples
-    std::vector<double> weights_fin(nparticle, 1. / nparticle);
-    std::vector<double> mean = calc_mean_particles(particles, weights_fin);
-    std::vector<double> cov_flat =
-        calc_cov_particles(particles, weights_fin, mean);
-    for (int i = 0; i < ndim; i++) {
-        std::cout << cov_flat.at(i * ndim + i) / 0.04 << " ";
+    if (myid == 0) {
+        std::vector<double> weights_fin(nparticle, 1. / nparticle);
+        std::vector<double> mean =
+            calc_mean_particles(particles_flat, weights_fin, nparticle, ndim);
+        std::vector<double> cov_flat = calc_cov_particles(
+            particles_flat, weights_fin, mean, nparticle, ndim);
+        for (int i = 0; i < ndim; i++) {
+            std::cout << cov_flat.at(i * ndim + i) / 0.04 << " ";
+        }
+        std::cout << std::endl;
     }
-    std::cout << std::endl;
     return;
 }
 }  // namespace smc_fault

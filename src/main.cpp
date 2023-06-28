@@ -1,3 +1,4 @@
+#include <mpi.h>
 #include <omp.h>
 
 #include <fstream>
@@ -9,6 +10,11 @@
 #include "smc_slip.hpp"
 
 int main(int argc, char *argv[]) {
+    int myid, numprocs;
+    MPI_Init(&argc, &argv);
+    MPI_Comm_rank(MPI_COMM_WORLD, &myid);
+    MPI_Comm_size(MPI_COMM_WORLD, &numprocs);
+
     std::string lxi_str = argv[1];
     std::string leta_str = argv[2];
 
@@ -291,5 +297,7 @@ int main(int argc, char *argv[]) {
     smc_fault::smc_exec(particles, output_dir, range, nparticle_fault,
                         cny_fault, coor_fault, obs_points, dvec, obs_unitvec,
                         obs_sigma, leta, node_to_elem, id_dof, lmat_index,
-                        lmat_val, llmat, nsar, ngnss, nparticle_slip);
+                        lmat_val, llmat, nsar, ngnss, nparticle_slip, myid,
+                        numprocs);
+    MPI_Finalize();
 }
