@@ -511,6 +511,7 @@ void smc_exec(std::vector<std::vector<double>> &particles,
             ofs << std::endl;
         }
     }
+    // barrier
     MPI_Barrier(MPI_COMM_WORLD);
 
     // list for resampling weights
