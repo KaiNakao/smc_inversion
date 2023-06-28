@@ -27,7 +27,7 @@ int main(int argc, char *argv[]) {
 
     // generate output dir
     // std::string output_dir = "output_" + lxi_str + "_" + leta_str + "/all/";
-    std::string output_dir = "output_mpi/";
+    std::string output_dir = "output_mpi2/";
     std::string op = "mkdir -p " + output_dir;
     system(op.c_str());
     const int nparticle_slip = 20000;

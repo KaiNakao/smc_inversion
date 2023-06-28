@@ -5,5 +5,5 @@
 
 cd /home/nakao/smc_inversion
 make main
-mpiexec -n 400 ./main 20 20 > mpi.log
+mpiexec -n 400 ./main 20 20 > mpi2.log
 

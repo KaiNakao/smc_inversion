@@ -57,8 +57,8 @@ void sample_init_particles(std::vector<double> &particles_flat,
 
     // probability distribution instance for generating samples from piror
     // (uniform distribution)
-    // std::random_device seed_gen;
-    std::mt19937 engine(12345);
+    std::random_device seed_gen;
+    std::mt19937 engine(seed_gen());
     std::vector<std::uniform_real_distribution<>> dist_vec(range.size());
     for (int idim = 0; idim < range.size(); idim++) {
         std::uniform_real_distribution<> dist(range.at(idim).at(0),
@@ -125,8 +125,8 @@ std::vector<std::vector<double>> gen_init_particles(
 
     // probability distribution instance for generating samples from piror
     // (uniform distribution)
-    // std::random_device seed_gen;
-    std::mt19937 engine(12345);
+    std::random_device seed_gen;
+    std::mt19937 engine(seed_gen());
     std::vector<std::uniform_real_distribution<>> dist_vec(range.size());
     for (int idim = 0; idim < range.size(); idim++) {
         std::uniform_real_distribution<> dist(range.at(idim).at(0),
@@ -289,8 +289,8 @@ std::vector<double> calc_cov_particles(
 
 std::vector<int> resample_particles(const int &nparticle,
                                     const std::vector<double> &weights) {
-    // std::random_device seed_gen;
-    std::mt19937 engine(12345);
+    std::random_device seed_gen;
+    std::mt19937 engine(seed_gen());
 
     // resampling
     // list for the indice of original particle of each resampled particle
@@ -358,8 +358,8 @@ void work_mcmc_sampling(
     const std::vector<double> &lmat_val,
     const std::vector<std::vector<double>> &llmat, const int &nsar,
     const int &ngnss, const int &nparticle_slip, const int &myid) {
-    // std::random_device seed_gen;
-    std::mt19937 engine(12345);
+    std::random_device seed_gen;
+    std::mt19937 engine(seed_gen());
     // probability distribution for MCCMC metropolis test
     std::uniform_real_distribution<> dist_metropolis(0., 1.);
     // standard normal distribution
@@ -448,8 +448,8 @@ void resample_particles_parallel(
     const std::vector<double> &lmat_val,
     const std::vector<std::vector<double>> &llmat, const int &nsar,
     const int &ngnss, const int &nparticle_slip) {
-    // std::random_device seed_gen;
-    std::mt19937 engine(12345);
+    std::random_device seed_gen;
+    std::mt19937 engine(seed_gen());
     // probability distribution for MCCMC metropolis test
     std::uniform_real_distribution<> dist_metropolis(0., 1.);
     // standard normal distribution
