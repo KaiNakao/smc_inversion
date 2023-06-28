@@ -85,9 +85,12 @@ std::vector<std::vector<double>> gen_init_particles(
     for (int iparticle = 0; iparticle < nparticle; iparticle++) {
         // sampling
         std::vector<double> particle(ndim);
-        for (int idim = 0; idim < range.size(); idim++) {
-            double x = dist_vec.at(idim)(engine);
-            particle.at(idim) = x;
+#pragma omp critical
+        {
+            for (int idim = 0; idim < range.size(); idim++) {
+                double x = dist_vec.at(idim)(engine);
+                particle.at(idim) = x;
+            }
         }
         particles.at(iparticle) = particle;
         // calculate negative log likelihood for the sample
@@ -100,7 +103,7 @@ std::vector<std::vector<double>> gen_init_particles(
                   << std::endl;
     }
     return particles;
-}
+}  // namespace smc_fault
 
 std::vector<double> calc_mean_std_vector(const std::vector<double> &vec) {
     // ret = {mean, std} over the component of vector
@@ -201,34 +204,40 @@ std::vector<double> calc_mean_particles(
     return mean;
 }
 
-std::vector<std::vector<double>> calc_cov_particles(
+std::vector<double> calc_cov_particles(
     const std::vector<std::vector<double>> &particles,
     const std::vector<double> &weights, const std::vector<double> &mean) {
     int n_particle = particles.size();
     int ndim = particles.at(0).size();
-    std::vector<std::vector<double>> cov(ndim, std::vector<double>(ndim));
+    // std::vector<std::vector<double>> cov(ndim, std::vector<double>(ndim));
+    std::vector<double> cov_flat(ndim * ndim);
     for (int iparticle = 0; iparticle < n_particle; iparticle++) {
         for (int idim = 0; idim < ndim; idim++) {
             for (int jdim = 0; jdim < ndim; jdim++) {
-                cov.at(idim).at(jdim) +=
+                cov_flat.at(idim * ndim + jdim) +=
                     weights.at(iparticle) *
                     (particles.at(iparticle).at(idim) - mean.at(idim)) *
                     (particles.at(iparticle).at(jdim) - mean.at(jdim));
             }
         }
     }
+    for (int idim = 0; idim < ndim; idim++) {
+        for (int jdim = 0; jdim < ndim; jdim++) {
+            cov_flat[idim * ndim + jdim] *= 0.04;
+        }
+    }
     std::cout << "cov:" << std::endl;
     for (int i = 0; i < ndim; i++) {
-        std::cout << cov.at(i).at(i) << " ";
+        std::cout << cov_flat.at(i * ndim + i) << " ";
     }
     std::cout << std::endl;
-    return cov;
+    return cov_flat;
 }
 
 void resample_particles_parallel(
     std::vector<std::vector<double>> &particles,
     const std::vector<double> &weights, std::vector<double> &likelihood_ls,
-    const std::vector<std::vector<double>> &cov, const double &gamma,
+    std::vector<double> &cov_flat, const double &gamma,
     const std::vector<std::vector<int>> &cny_fault,
     const std::vector<std::vector<double>> &coor_fault,
     const std::vector<std::vector<double>> &obs_points,
@@ -289,37 +298,32 @@ void resample_particles_parallel(
         assigned_id[j_particle].push_back(i_particle);
     }
 
-    // covariance matrix for MCMC proposal distribution
-    const double s = 0.2;
-    double *cov_flat = (double *)malloc(sizeof(double) * ndim * ndim);
-    for (int i = 0; i < ndim; i++) {
-        for (int j = 0; j < ndim; j++) {
-            cov_flat[i * ndim + j] = cov[i][j] * s * s;
-        }
-    }
     // LAPACK function for LU decomposition of matrix
-    LAPACKE_dpotrf(LAPACK_ROW_MAJOR, 'L', ndim, cov_flat, ndim);
+    LAPACKE_dpotrf(LAPACK_ROW_MAJOR, 'L', ndim, &cov_flat[0], ndim);
 
     // MCMC sampling from the updated distribution
 #pragma omp parallel for schedule(dynamic)
     for (int i_particle = 0; i_particle < n_particle; i_particle++) {
-        if (assigned_id[i_particle].size() == 0) {
-            // no need to start MCMC
-            continue;
-        }
+        // if (assigned_id[i_particle].size() == 0) {
+        //     // no need to start MCMC
+        //     continue;
+        // }
 
         // ----_cur means current configuration
         std::vector<double> particle_cur = particles.at(i_particle);
-        double likelihood_cur = calc_likelihood(
-            particle_cur, cny_fault, coor_fault, dvec, obs_points, obs_unitvec,
-            obs_sigma, leta, node_to_elem, id_dof, nsar, ngnss, lmat_index,
-            lmat_val, llmat, nparticle_slip);
 
         for (int j_particle : assigned_id[i_particle]) {
+            double likelihood_cur = calc_likelihood(
+                particle_cur, cny_fault, coor_fault, dvec, obs_points,
+                obs_unitvec, obs_sigma, leta, node_to_elem, id_dof, nsar, ngnss,
+                lmat_index, lmat_val, llmat, nparticle_slip);
             // propose particle_cand
             std::vector<double> rand(ndim);
-            for (int idim = 0; idim < ndim; idim++) {
-                rand.at(idim) = dist_stnorm(engine);
+#pragma omp critical
+            {
+                for (int idim = 0; idim < ndim; idim++) {
+                    rand.at(idim) = dist_stnorm(engine);
+                }
             }
             std::vector<double> particle_cand(ndim);
             for (int idim = 0; idim < ndim; idim++) {
@@ -353,18 +357,16 @@ void resample_particles_parallel(
             // save to new particle list
             particles_new.at(j_particle) = particle_cur;
             likelihood_ls_new.at(j_particle) = likelihood_cur;
-            likelihood_cur = calc_likelihood(
-                particle_cur, cny_fault, coor_fault, dvec, obs_points,
-                obs_unitvec, obs_sigma, leta, node_to_elem, id_dof, nsar, ngnss,
-                lmat_index, lmat_val, llmat, nparticle_slip);
+            // likelihood_cur = calc_likelihood(
+            //     particle_cur, cny_fault, coor_fault, dvec, obs_points,
+            //     obs_unitvec, obs_sigma, leta, node_to_elem, id_dof, nsar,
+            //     ngnss, lmat_index, lmat_val, llmat, nparticle_slip);
         }
     }
     // update configurations
     likelihood_ls = likelihood_ls_new;
     particles = particles_new;
 
-    // manually deallocate C-style array
-    free(cov_flat);
     return;
 }
 
@@ -384,6 +386,7 @@ void smc_exec(std::vector<std::vector<double>> &particles,
               const std::vector<double> &lmat_val,
               const std::vector<std::vector<double>> &llmat, const int &nsar,
               const int &ngnss, const int &nparticle_slip) {
+    const int ndim = range.size();
     // list for (negative log) likelihood for each particles
     std::vector<double> likelihood_ls(nparticle);
     // sampling from the prior distribution
@@ -417,11 +420,11 @@ void smc_exec(std::vector<std::vector<double>> &particles,
 
         // calculate mean and covariance of the samples
         std::vector<double> mean = calc_mean_particles(particles, weights);
-        std::vector<std::vector<double>> cov =
+        std::vector<double> cov_flat =
             calc_cov_particles(particles, weights, mean);
 
         // resampling and MCMC sampling from the updated distribution
-        resample_particles_parallel(particles, weights, likelihood_ls, cov,
+        resample_particles_parallel(particles, weights, likelihood_ls, cov_flat,
                                     gamma, cny_fault, coor_fault, obs_points,
                                     dvec, obs_unitvec, obs_sigma, leta,
                                     node_to_elem, id_dof, lmat_index, lmat_val,
@@ -459,6 +462,16 @@ void smc_exec(std::vector<std::vector<double>> &particles,
     // }
     // ofs_map << likelihood_ls.at(map_id);
     // ofs_map << std::endl;
+
+    // calculate mean and covariance of the samples
+    std::vector<double> weights_fin(nparticle, 1. / nparticle);
+    std::vector<double> mean = calc_mean_particles(particles, weights_fin);
+    std::vector<double> cov_flat =
+        calc_cov_particles(particles, weights_fin, mean);
+    for (int i = 0; i < ndim; i++) {
+        std::cout << cov_flat.at(i * ndim + i) / 0.04 << " ";
+    }
+    std::cout << std::endl;
     return;
 }
 }  // namespace smc_fault

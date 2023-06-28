@@ -261,8 +261,8 @@ void resample_particles(
     const double &log_sigma_gnss2, const int &nsar, const int &ngnss,
     const double &log_alpha2, const std::vector<int> &lmat_index,
     const std::vector<double> &lmat_val) {
-    std::random_device seed_gen;
-    std::mt19937 engine(seed_gen());
+    // std::random_device seed_gen;
+    std::mt19937 engine(12345);
     // probability distribution for MCCMC metropolis test
     std::uniform_real_distribution<> dist_metropolis(0., 1.);
     // standard normal distribution
