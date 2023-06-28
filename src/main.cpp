@@ -1,3 +1,4 @@
+#include <mpi.h>
 #include <omp.h>
 
 #include <fstream>
@@ -9,6 +10,11 @@
 #include "smc_slip.hpp"
 
 int main(int argc, char *argv[]) {
+    int myid, numprocs;
+    MPI_Init(&argc, &argv);
+    MPI_Comm_rank(MPI_COMM_WORLD, &myid);
+    MPI_Comm_size(MPI_COMM_WORLD, &numprocs);
+
     std::string lxi_str = argv[1];
     std::string leta_str = argv[2];
 
@@ -16,15 +22,16 @@ int main(int argc, char *argv[]) {
     double lxi = std::stod(lxi_str);
     double leta = std::stod(leta_str);
     // num of patch
-    int nxi = lxi / 2.5;
-    int neta = leta / 2.5;
+    int nxi = lxi / 5;
+    int neta = leta / 5;
 
     // generate output dir
-    std::string output_dir = "output_" + lxi_str + "_" + leta_str + "/all/";
+    // std::string output_dir = "output_" + lxi_str + "_" + leta_str + "/all/";
+    std::string output_dir = "tmp/";
     std::string op = "mkdir -p " + output_dir;
     system(op.c_str());
-    const int nparticle_slip = 20000;
-    const int nparticle_fault = 10000;
+    const int nparticle_slip = 200;
+    const int nparticle_fault = 1000;
     // set fault geometry
     // cny_fault[patch_id] = {node_id}
     std::vector<std::vector<int>> cny_fault;
@@ -268,27 +275,29 @@ int main(int argc, char *argv[]) {
     // std::exit(0);
 
     // Execute SMC for slip while fixing the fault
-    std::vector<double> particle = {
-        1.09527761e+00, -1.23328200e+01, -1.36120457e+01, 1.40388275e+00,
-        7.46067094e+01, 1.54248111e-01,  -1.19578646e-01, -2.29941335e+00};
-    double likelihood = smc_fault::calc_likelihood(
-        particle, cny_fault, coor_fault, dvec, obs_points, obs_unitvec,
-        obs_sigma, leta, node_to_elem, id_dof, nsar, ngnss, lmat_index,
-        lmat_val, llmat, nparticle_slip);
-    std::cout << " result: " << likelihood << std::endl;
-    std::exit(0);
+    // std::vector<double> particle = {
+    //     1.09527761e+00, -1.23328200e+01, -1.36120457e+01, 1.40388275e+00,
+    //     7.46067094e+01, 1.54248111e-01,  -1.19578646e-01, -2.29941335e+00};
+    // double likelihood = smc_fault::calc_likelihood(
+    //     particle, cny_fault, coor_fault, dvec, obs_points, obs_unitvec,
+    //     obs_sigma, leta, node_to_elem, id_dof, nsar, ngnss, lmat_index,
+    //     lmat_val, llmat, nparticle_slip);
+    // std::cout << " result: " << likelihood << std::endl;
+    // std::exit(0);
 
     // range for xf, yf, zf, strike, dip, log_sigma2_sar, log_sigma2_gnss,
     // log_alpha2
-    // std::vector<std::vector<double>> range = {{-10, 10}, {-30, 0}, {-30, -1},
-    //                                           {-20, 20}, {50, 90}, {-2, 2},
-    //                                           {-2, 2},   {-10, -2}};
+    std::vector<std::vector<double>> range = {{-10, 10}, {-30, 0}, {-30, -1},
+                                              {-20, 20}, {50, 90}, {-2, 2},
+                                              {-2, 2},   {-10, -2}};
 
     // sequential monte carlo sampling for fault parameters
     // numbers of samples for approximation of distributions
-    // std::vector<std::vector<double>> particles;
-    // smc_fault::smc_exec(particles, output_dir, range, nparticle_fault,
-    //                     cny_fault, coor_fault, obs_points, dvec, obs_unitvec,
-    //                     obs_sigma, leta, node_to_elem, id_dof, lmat_index,
-    //                     lmat_val, llmat, nsar, ngnss, nparticle_slip);
+    std::vector<std::vector<double>> particles;
+    smc_fault::smc_exec(particles, output_dir, range, nparticle_fault,
+                        cny_fault, coor_fault, obs_points, dvec, obs_unitvec,
+                        obs_sigma, leta, node_to_elem, id_dof, lmat_index,
+                        lmat_val, llmat, nsar, ngnss, nparticle_slip, myid,
+                        numprocs);
+    MPI_Finalize();
 }

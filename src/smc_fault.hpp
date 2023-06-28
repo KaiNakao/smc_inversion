@@ -1,4 +1,9 @@
 #pragma once
+#include <mpi.h>
+
+#include <algorithm>
+#include <cmath>
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <random>
@@ -35,7 +40,8 @@ std::vector<std::vector<double>> gen_init_particles(
     const std::vector<int> &id_dof, const std::vector<int> &lmat_index,
     const std::vector<double> &lmat_val,
     const std::vector<std::vector<double>> &llmat, const int &nsar,
-    const int &ngnss, const int &nparticle_slip);
+    const int &ngnss, const int &nparticle_slip, const int &myid,
+    const int &numprocs);
 
 std::vector<double> calc_mean_std_vector(const std::vector<double> &vec);
 
@@ -49,14 +55,14 @@ std::vector<double> calc_mean_particles(
     const std::vector<std::vector<double>> &particles,
     const std::vector<double> &weights);
 
-std::vector<std::vector<double>> calc_cov_particles(
+std::vector<double> calc_cov_particles(
     const std::vector<std::vector<double>> &particles,
     const std::vector<double> &weights, const std::vector<double> &mean);
 
 void resample_particles_parallel(
     std::vector<std::vector<double>> &particles,
     const std::vector<double> &weights, std::vector<double> &likelihood_ls,
-    const std::vector<std::vector<double>> &cov, const double &gamma,
+    std::vector<double> &cov_flat, const double &gamma,
     const std::vector<std::vector<int>> &cny_fault,
     const std::vector<std::vector<double>> &coor_fault,
     const std::vector<std::vector<double>> &obs_points,
@@ -67,7 +73,8 @@ void resample_particles_parallel(
     const std::vector<int> &id_dof, const std::vector<int> &lmat_index,
     const std::vector<double> &lmat_val,
     const std::vector<std::vector<double>> &llmat, const int &nsar,
-    const int &ngnss, const int &nparticle_slip);
+    const int &ngnss, const int &nparticle_slip, const int &myid,
+    const int &numprocs);
 
 void smc_exec(std::vector<std::vector<double>> &particles,
               const std::string &output_dir,
@@ -84,5 +91,6 @@ void smc_exec(std::vector<std::vector<double>> &particles,
               const std::vector<int> &lmat_index,
               const std::vector<double> &lmat_val,
               const std::vector<std::vector<double>> &llmat, const int &nsar,
-              const int &ngnss, const int &nparticle_slip);
+              const int &ngnss, const int &nparticle_slip, const int &myid,
+              const int &numprocs);
 }  // namespace smc_fault
