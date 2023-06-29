@@ -27,10 +27,10 @@ int main(int argc, char *argv[]) {
 
     // generate output dir
     // std::string output_dir = "output_" + lxi_str + "_" + leta_str + "/all/";
-    std::string output_dir = "output_mpi2/";
+    std::string output_dir = "output_mpi20000/";
     std::string op = "mkdir -p " + output_dir;
     system(op.c_str());
-    const int nparticle_slip = 20000;
+    const int nparticle_slip = 100000;
     const int nparticle_fault = 20000;
     // set fault geometry
     // cny_fault[patch_id] = {node_id}
