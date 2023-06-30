@@ -5,5 +5,5 @@
 
 cd /home/nakao/smc_inversion
 make main
-./main 20 20 > omp20000.log
+./main 20 20 > omp40000.log
 
