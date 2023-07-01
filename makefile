@@ -1,6 +1,6 @@
 COMPILER_CPP = icpx
 COMPILER_F = ifx
-CFLAGS   = -Wall -Wextra -Wno-sign-compare -Wno-tautological-constant-compare -O3 -fiopenmp -lifcore -qmkl -lmpi
+CFLAGS   = -Wall -Wextra -Wno-sign-compare -Wno-tautological-constant-compare -O3 -fiopenmp -lifcore -qmkl -lmpi -fstack-usage
 FFLAGS   = -O3 -fiopenmp
 # CFLAGS   = -Wall -Wextra -Wno-sign-compare -Wno-tautological-constant-compare -g -fiopenmp -lifcore -qmkl
 # FFLAGS   = -g -fiopenmp

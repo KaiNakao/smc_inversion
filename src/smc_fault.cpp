@@ -1,5 +1,9 @@
 #include "smc_fault.hpp"
 
+#include <cstdlib>
+
+#include "mpi.h"
+
 namespace smc_fault {
 
 double calc_likelihood(
@@ -197,7 +201,6 @@ double find_next_gamma(const double &gamma_prev,
     while (err > pow(10, -8)) {
         gamma = (lower + upper) / 2.;
 
-        std::cout << "gamma: " << gamma << std::endl;
         double diff_gamma = gamma - gamma_prev;
         for (int iparticle = 0; iparticle < nparticle; iparticle++) {
             double likelihood = likelihood_ls.at(iparticle);
@@ -633,8 +636,10 @@ void smc_exec(std::vector<std::vector<double>> &particles,
     std::vector<int> sum_assigned_ls(numprocs);
     std::vector<std::vector<double>> buf_likelihood(numprocs);
     std::vector<std::vector<double>> buf_particles_flat(numprocs);
+    double st_time, en_time;
     while (1. - gamma > pow(10, -8)) {
         if (myid == 0) {
+            st_time = MPI_Wtime();
             // list for resampling weights
             std::vector<double> weights(nparticle, 1.);
             // find the gamma such that c.o.v of weights = 0.5
@@ -673,6 +678,11 @@ void smc_exec(std::vector<std::vector<double>> &particles,
         MPI_Scatter(&assigned_num[0], work_size, MPI_INT,
                     &work_assigned_num.at(0), work_size, MPI_INT, 0,
                     MPI_COMM_WORLD);
+        if (myid == 0) {
+            en_time = MPI_Wtime();
+            std::cout << "1part time: " << en_time - st_time << std::endl;
+            st_time = MPI_Wtime();
+        }
         work_mcmc_sampling(work_assigned_num, work_particles_flat,
                            work_particles_flat_new, work_likelihood_ls_new,
                            work_size, ndim, cov_flat, gamma, cny_fault,
@@ -680,6 +690,11 @@ void smc_exec(std::vector<std::vector<double>> &particles,
                            leta, node_to_elem, id_dof, lmat_index, lmat_val,
                            llmat, nsar, ngnss, nparticle_slip, myid);
         MPI_Barrier(MPI_COMM_WORLD);
+        if (myid == 0) {
+            en_time = MPI_Wtime();
+            std::cout << "2part time: " << en_time - st_time << std::endl;
+            st_time = MPI_Wtime();
+        }
         if (myid == 0) {
             for (int iproc = 1; iproc < numprocs; iproc++) {
                 MPI_Recv(&buf_likelihood.at(iproc).at(0),
@@ -735,6 +750,10 @@ void smc_exec(std::vector<std::vector<double>> &particles,
             iter++;
         }
         MPI_Barrier(MPI_COMM_WORLD);
+        if (myid == 0) {
+            en_time = MPI_Wtime();
+            std::cout << "3part time: " << en_time - st_time << std::endl;
+        }
     }
 
     // // output MAP value
