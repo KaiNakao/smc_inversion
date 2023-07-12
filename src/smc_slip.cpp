@@ -1,4 +1,7 @@
 #include "smc_slip.hpp"
+
+#include "mpi.h"
+
 namespace smc_slip {
 
 double cdf_norm(double x, double mu, double sigma2) {
@@ -21,8 +24,12 @@ double calc_likelihood(const std::vector<double> &svec,
                        const int &ngnss, double &delta_norm) {
     // delta norm is a measure for residual
     std::vector<double> gsvec(dvec.size());
+    // double st_time, en_time;
+    // st_time = MPI_Wtime();
     cblas_dgemv(CblasRowMajor, CblasNoTrans, dvec.size(), svec.size(), 1.,
                 &gmat_flat[0], svec.size(), &svec[0], 1, 0., &gsvec[0], 1);
+    // en_time = MPI_Wtime();
+    // printf("dgemv etime: %f\n", en_time - st_time);
 
     delta_norm = 0.;
     double delta_loss = 0;
@@ -475,27 +482,27 @@ double smc_exec(std::vector<std::vector<double>> &particles,
         // }
         iter++;
     }
-    std::ofstream ofs(output_dir + std::to_string(iter) + ".csv");
-    for (int iparticle = 0; iparticle < nparticle; iparticle++) {
-        const std::vector<double> particle = particles.at(iparticle);
-        std::vector<double> slip(lmat_index.size() / 5);
-        for (int idof = 0; idof < id_dof.size(); idof++) {
-            int inode = id_dof.at(idof);
-            slip.at(2 * inode) = particle.at(2 * idof);
-            slip.at(2 * inode + 1) = particle.at(2 * idof + 1);
-        }
-        for (int i = 0; i < slip.size(); i++) {
-            ofs << slip.at(i) << " ";
-        }
-        ofs << likelihood_ls.at(iparticle) + prior_ls.at(iparticle);
-        // ofs << std::endl;
-        ofs << " ";
-        double delta_norm = 0.;
-        calc_likelihood(particle, dvec, obs_sigma, sigma2_full, gmat_flat,
-                        log_sigma_sar2, log_sigma_gnss2, nsar, ngnss,
-                        delta_norm);
-        ofs << delta_norm << std::endl;
-    }
+    // std::ofstream ofs(output_dir + std::to_string(iter) + ".csv");
+    // for (int iparticle = 0; iparticle < nparticle; iparticle++) {
+    //     const std::vector<double> particle = particles.at(iparticle);
+    //     std::vector<double> slip(lmat_index.size() / 5);
+    //     for (int idof = 0; idof < id_dof.size(); idof++) {
+    //         int inode = id_dof.at(idof);
+    //         slip.at(2 * inode) = particle.at(2 * idof);
+    //         slip.at(2 * inode + 1) = particle.at(2 * idof + 1);
+    //     }
+    //     for (int i = 0; i < slip.size(); i++) {
+    //         ofs << slip.at(i) << " ";
+    //     }
+    //     ofs << likelihood_ls.at(iparticle) + prior_ls.at(iparticle);
+    //     // ofs << std::endl;
+    //     ofs << " ";
+    //     double delta_norm = 0.;
+    //     calc_likelihood(particle, dvec, obs_sigma, sigma2_full, gmat_flat,
+    //                     log_sigma_sar2, log_sigma_gnss2, nsar, ngnss,
+    //                     delta_norm);
+    //     ofs << delta_norm << std::endl;
+    // }
 
     // product of S_j (sum for negative log value)
     double neglog_sum = 0.;

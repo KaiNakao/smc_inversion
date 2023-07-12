@@ -101,7 +101,7 @@ void resample_particles_parallel(
     const std::vector<std::vector<double>> &llmat, const int &nsar,
     const int &ngnss, const int &nparticle_slip);
 
-void smc_exec(std::vector<std::vector<double>> &particles,
+void smc_exec(std::vector<double> &particles_flat,
               const std::string &output_dir,
               const std::vector<std::vector<double>> &range,
               const int &nparticle,

@@ -1,9 +1,12 @@
 #!/bin/sh
-#PBS -q calc
-#PBS -l select=5:ncpus=80:mpiprocs=80
-#PBS -N smc_inv_mpi
+#PBS -q calc-lm
+#PBS -l select=1:ncpus=160:mpiprocs=160
+#PBS -N smc_inv
 
 cd /home/nakao/smc_inversion
 make main
-mpiexec -n 400 ./main 20 20 > mpi80000.log
+ulimit -s unlimited
+
+mpiexec -n 160 bash -c "ulimit -s unlimited"
+mpiexec -n 160 ./main 15 15 > cvtest.log
 

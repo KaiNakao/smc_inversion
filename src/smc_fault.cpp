@@ -1,6 +1,7 @@
 #include "smc_fault.hpp"
 
 #include <cstdlib>
+#include <fstream>
 
 #include "mpi.h"
 
@@ -26,10 +27,13 @@ double calc_likelihood(
     double log_sigma_sar2 = particle.at(5);
     double log_sigma_gnss2 = particle.at(6);
     double log_alpha2 = particle.at(7);
+    double st_time, en_time;
+    st_time = MPI_Wtime();
     // Calculate greens function for the sampled fault
     auto gmat = gfunc::calc_greens_func(cny_fault, coor_fault, obs_points,
                                         obs_unitvec, leta, xf, yf, zf, strike,
                                         dip, node_to_elem, id_dof, nsar, ngnss);
+    en_time = MPI_Wtime();
 
     // diag component of Sigma
     //  (variance matrix for the likelihood function of slip)
@@ -46,11 +50,18 @@ double calc_likelihood(
 
     // Sequential Monte Carlo sampling for slip
     // calculate negative log of likelihood
+    st_time = MPI_Wtime();
     std::vector<std::vector<double>> particles_slip(nparticle_slip);
     double neglog = smc_slip::smc_exec(
         particles_slip, "output_slip/", nparticle_slip, dvec, obs_sigma,
         sigma2_full, gmat, log_sigma_sar2, log_sigma_gnss2, nsar, ngnss,
         log_alpha2, lmat_index, lmat_val, llmat, id_dof);
+    en_time = MPI_Wtime();
+    // std::cout << xf << " " << yf << " " << zf << " " << strike << " " << dip
+    //           << " " << log_sigma_sar2 << " " << log_sigma_gnss2 << " "
+    //           << log_alpha2 << " " << neglog << " " << en_time - st_time
+    //           << std::endl;
+    // std::cout << "smc etime: " << en_time - st_time << std::endl;
     return neglog;
 }
 
@@ -76,6 +87,7 @@ void sample_init_particles(std::vector<double> &particles_flat,
             particles_flat.at(iparticle * ndim + idim) = x;
         }
     }
+
     return;
 }
 
@@ -94,6 +106,7 @@ void work_eval_init_particles(
     const std::vector<double> &lmat_val,
     const std::vector<std::vector<double>> &llmat, const int &nsar,
     const int &ngnss, const int &nparticle_slip, const int &myid) {
+#pragma omp parallel for
     for (int iparticle = 0; iparticle < work_size; iparticle++) {
         std::vector<double> particle(ndim);
         for (int idim = 0; idim < ndim; idim++) {
@@ -377,6 +390,7 @@ void work_mcmc_sampling(
         id_start.at(work_size - 1) + work_assigned_num.at(work_size - 1);
     work_particles_flat_new.resize(sum_assigned * ndim);
     work_likelihood_ls_new.resize(sum_assigned);
+#pragma omp parallel for
     for (int iparticle = 0; iparticle < work_size; iparticle++) {
         int nassigned = work_assigned_num.at(iparticle);
         int istart = id_start.at(iparticle);
@@ -414,7 +428,6 @@ void work_mcmc_sampling(
 
             // metropolis test and check domain of definition
             if (particle_cand.at(4) < 90 && particle_cand.at(2) < 0 &&
-                particle_cand.at(7) < -2 &&
                 exp(gamma * (likelihood_cur - likelihood_cand)) > metropolis) {
                 // std::cout << "accepted likelihood: " << likelihood_cand
                 //           << std::endl;
@@ -573,7 +586,7 @@ void resample_particles_parallel(
     return;
 }
 
-void smc_exec(std::vector<std::vector<double>> &particles,
+void smc_exec(std::vector<double> &particles_flat,
               const std::string &output_dir,
               const std::vector<std::vector<double>> &range,
               const int &nparticle,
@@ -595,7 +608,6 @@ void smc_exec(std::vector<std::vector<double>> &particles,
     const int work_size = nparticle / numprocs;
     // list for (negative log) likelihood for each particles
     std::vector<double> likelihood_ls;
-    std::vector<double> particles_flat;
     if (myid == 0) {
         likelihood_ls.resize(nparticle);
         // sampling from the prior distribution
