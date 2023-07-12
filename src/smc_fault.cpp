@@ -343,7 +343,6 @@ void resample_particles_parallel(
 
             // metropolis test and check domain of definition
             if (particle_cand.at(4) < 90 && particle_cand.at(2) < 0 &&
-                particle_cand.at(7) < -2 &&
                 exp(gamma * (likelihood_cur - likelihood_cand)) > metropolis) {
                 // std::cout << "accepted likelihood: " << likelihood_cand
                 //           << std::endl;
