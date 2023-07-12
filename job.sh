@@ -5,5 +5,6 @@
 
 cd /home/nakao/smc_inversion
 make main
+ulimit -s unlimited
 ./main 20 20 > omp100000.log
 
