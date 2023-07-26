@@ -113,6 +113,9 @@ int main(int argc, char *argv[]) {
     std::vector<double> lmat_val;
     init::gen_sparse_lmat(lmat, lmat_index, lmat_val);
 
+    // constrain max value for slip
+    double max_slip = 3.;
+
     // const int ndim = 8;
     // const int nfold = 4;
     // cross_validation(output_dir, nfold, nparticle_fault, cny_fault,
@@ -259,8 +262,8 @@ int main(int argc, char *argv[]) {
     smc_fault::smc_exec(particles_flat, output_dir, range, nparticle_fault,
                         cny_fault, coor_fault, obs_points, dvec, obs_unitvec,
                         obs_sigma, leta, node_to_elem, id_dof, lmat_index,
-                        lmat_val, llmat, nsar, ngnss, nparticle_slip, myid,
-                        numprocs);
+                        lmat_val, llmat, nsar, ngnss, nparticle_slip, max_slip,
+                        myid, numprocs);
     MPI_Finalize();
 }
 
@@ -278,7 +281,8 @@ void aggregate_slip(
     const std::vector<int> &id_dof, const std::vector<int> lmat_index,
     const std::vector<double> lmat_val,
     const std::vector<std::vector<double>> llmat, const int &nsar,
-    const int &ngnss, const int &myid, const int &numprocs) {
+    const int &ngnss, const double &max_slip, const int &myid,
+    const int &numprocs) {
     const int &work_size = nparticle_fault / numprocs;
     std::string aggregate_dir = output_dir + "aggregate/";
     if (myid == 0) {
@@ -430,7 +434,7 @@ void aggregate_slip(
         double neglog = smc_slip::smc_exec(
             particles_slip, dir, nparticle_slip, dvec, obs_sigma, sigma2_full,
             gmat, log_sigma_sar2, log_sigma_gnss2, nsar, ngnss, log_alpha2,
-            lmat_index, lmat_val, llmat, id_dof);
+            lmat_index, lmat_val, llmat, id_dof, max_slip);
         // std::cout << "iparticle_fault = " << work_size * myid +
         // iparticle_fault
         //           << " neglog: " << neglog << std::endl;
@@ -565,7 +569,7 @@ void cross_validation(
     const std::vector<int> &id_dof, const std::vector<int> &lmat_index,
     const std::vector<double> &lmat_val, const int &ndim,
     const std::vector<std::vector<double>> &llmat, const int &nparticle_slip,
-    const int &myid, const int &numprocs) {
+    const double &max_slip, const int &myid, const int &numprocs) {
     const int work_size = nparticle_fault / numprocs;
     std::ofstream ofs(output_dir + "cv_score.dat");
     for (int cv_id = 0; cv_id < nfold; cv_id++) {
@@ -599,7 +603,7 @@ void cross_validation(
                             nparticle_fault, cny_fault, coor_fault, obs_points,
                             dvec, obs_unitvec, obs_sigma, leta, node_to_elem,
                             id_dof, lmat_index, lmat_val, llmat, nsar, ngnss,
-                            nparticle_slip, myid, numprocs);
+                            nparticle_slip, max_slip, myid, numprocs);
         // MPI_Barrier(MPI_COMM_WORLD);
         // MPI_Finalize();
         // exit(0);
@@ -687,10 +691,10 @@ void cross_validation(
             // Sequential Monte Carlo sampling for slip
             // calculate negative log of likelihood
             std::vector<std::vector<double>> particles_slip(nparticle_slip);
-            smc_slip::smc_exec(particles_slip, output_dir_cv, nparticle_slip,
-                               dvec, obs_sigma, sigma2_full, gmat,
-                               log_sigma_sar2, log_sigma_gnss2, nsar, ngnss,
-                               log_alpha2, lmat_index, lmat_val, llmat, id_dof);
+            smc_slip::smc_exec(
+                particles_slip, output_dir_cv, nparticle_slip, dvec, obs_sigma,
+                sigma2_full, gmat, log_sigma_sar2, log_sigma_gnss2, nsar, ngnss,
+                log_alpha2, lmat_index, lmat_val, llmat, id_dof, max_slip);
 
             for (int islip = 0; islip < nparticle_slip; islip++) {
                 auto svec = particles_slip.at(islip);

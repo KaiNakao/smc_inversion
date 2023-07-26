@@ -18,7 +18,8 @@ double calc_likelihood(
     const std::unordered_map<int, std::vector<int>> &node_to_elem,
     const std::vector<int> &id_dof, const int &nsar, const int &ngnss,
     const std::vector<int> &lmat_index, const std::vector<double> &lmat_val,
-    const std::vector<std::vector<double>> &llmat, const int nparticle_slip) {
+    const std::vector<std::vector<double>> &llmat, const int nparticle_slip,
+    const double &max_slip) {
     double xf = particle.at(0);
     double yf = particle.at(1);
     double zf = particle.at(2);
@@ -55,7 +56,7 @@ double calc_likelihood(
     double neglog = smc_slip::smc_exec(
         particles_slip, "output_slip/", nparticle_slip, dvec, obs_sigma,
         sigma2_full, gmat, log_sigma_sar2, log_sigma_gnss2, nsar, ngnss,
-        log_alpha2, lmat_index, lmat_val, llmat, id_dof);
+        log_alpha2, lmat_index, lmat_val, llmat, id_dof, max_slip);
     // en_time = MPI_Wtime();
     // std::cout << xf << " " << yf << " " << zf << " " << strike << " " << dip
     //           << " " << log_sigma_sar2 << " " << log_sigma_gnss2 << " "
@@ -114,7 +115,8 @@ void work_eval_init_particles(
     const std::vector<int> &id_dof, const std::vector<int> &lmat_index,
     const std::vector<double> &lmat_val,
     const std::vector<std::vector<double>> &llmat, const int &nsar,
-    const int &ngnss, const int &nparticle_slip, const int &myid) {
+    const int &ngnss, const int &nparticle_slip, const double &max_slip,
+    const int &myid) {
 #pragma omp parallel for
     for (int iparticle = 0; iparticle < work_size; iparticle++) {
         std::vector<double> particle(ndim);
@@ -125,64 +127,13 @@ void work_eval_init_particles(
         work_init_likelihood.at(iparticle) = calc_likelihood(
             particle, cny_fault, coor_fault, dvec, obs_points, obs_unitvec,
             obs_sigma, leta, node_to_elem, id_dof, nsar, ngnss, lmat_index,
-            lmat_val, llmat, nparticle_slip);
+            lmat_val, llmat, nparticle_slip, max_slip);
         // std::cout << "iparticle: " << iparticle + myid * work_size
         //           << " likelihood: " <<
         //           work_init_likelihood.at(iparticle)
         //           << std::endl;
     }
 }
-
-std::vector<std::vector<double>> gen_init_particles(
-    const int &nparticle, const std::vector<std::vector<double>> &range,
-    std::vector<double> &likelihood_ls,
-    const std::vector<std::vector<int>> &cny_fault,
-    const std::vector<std::vector<double>> &coor_fault,
-    const std::vector<std::vector<double>> &obs_points,
-    const std::vector<double> &dvec,
-    const std::vector<std::vector<double>> &obs_unitvec,
-    const std::vector<double> &obs_sigma, const double &leta,
-    const std::unordered_map<int, std::vector<int>> &node_to_elem,
-    const std::vector<int> &id_dof, const std::vector<int> &lmat_index,
-    const std::vector<double> &lmat_val,
-    const std::vector<std::vector<double>> &llmat, const int &nsar,
-    const int &ngnss, const int &nparticle_slip) {
-    // dimension of particle
-    const int ndim = range.size();
-
-    // probability distribution instance for generating samples from piror
-    // (uniform distribution)
-    std::random_device seed_gen;
-    std::mt19937 engine(seed_gen());
-    std::vector<std::uniform_real_distribution<>> dist_vec(range.size());
-    for (int idim = 0; idim < range.size(); idim++) {
-        std::uniform_real_distribution<> dist(range.at(idim).at(0),
-                                              range.at(idim).at(1));
-        dist_vec.at(idim) = dist;
-    }
-
-    // samples to return
-    std::vector<std::vector<double>> particles(nparticle,
-                                               std::vector<double>(ndim));
-    for (int iparticle = 0; iparticle < nparticle; iparticle++) {
-        // sampling
-        std::vector<double> particle(ndim);
-        for (int idim = 0; idim < range.size(); idim++) {
-            double x = dist_vec.at(idim)(engine);
-            particle.at(idim) = x;
-        }
-        particles.at(iparticle) = particle;
-        // calculate negative log likelihood for the sample
-        likelihood_ls.at(iparticle) = calc_likelihood(
-            particle, cny_fault, coor_fault, dvec, obs_points, obs_unitvec,
-            obs_sigma, leta, node_to_elem, id_dof, nsar, ngnss, lmat_index,
-            lmat_val, llmat, nparticle_slip);
-        // std::cout << "iparticle: " << iparticle
-        //           << " likelihood: " << likelihood_ls.at(iparticle)
-        //           << std::endl;
-    }
-    return particles;
-}  // namespace smc_fault
 
 std::vector<double> calc_mean_std_vector(const std::vector<double> &vec) {
     // ret = {mean, std} over the component of vector
@@ -383,7 +334,8 @@ void work_mcmc_sampling(
     const std::vector<int> &id_dof, const std::vector<int> &lmat_index,
     const std::vector<double> &lmat_val,
     const std::vector<std::vector<double>> &llmat, const int &nsar,
-    const int &ngnss, const int &nparticle_slip, const int &myid) {
+    const int &ngnss, const int &nparticle_slip, const double &max_slip,
+    const int &myid) {
     std::random_device seed_gen;
     std::mt19937 engine(seed_gen());
     // probability distribution for MCCMC metropolis test
@@ -413,7 +365,7 @@ void work_mcmc_sampling(
             double likelihood_cur = calc_likelihood(
                 particle_cur, cny_fault, coor_fault, dvec, obs_points,
                 obs_unitvec, obs_sigma, leta, node_to_elem, id_dof, nsar, ngnss,
-                lmat_index, lmat_val, llmat, nparticle_slip);
+                lmat_index, lmat_val, llmat, nparticle_slip, max_slip);
             // propose particle_cand
             std::vector<double> rand(ndim);
             for (int idim = 0; idim < ndim; idim++) {
@@ -433,7 +385,7 @@ void work_mcmc_sampling(
             double likelihood_cand = calc_likelihood(
                 particle_cand, cny_fault, coor_fault, dvec, obs_points,
                 obs_unitvec, obs_sigma, leta, node_to_elem, id_dof, nsar, ngnss,
-                lmat_index, lmat_val, llmat, nparticle_slip);
+                lmat_index, lmat_val, llmat, nparticle_slip, max_slip);
             double metropolis = dist_metropolis(engine);
 
             // metropolis test and check domain of definition
@@ -459,143 +411,6 @@ void work_mcmc_sampling(
     return;
 }
 
-void resample_particles_parallel(
-    std::vector<std::vector<double>> &particles,
-    const std::vector<double> &weights, std::vector<double> &likelihood_ls,
-    std::vector<double> &cov_flat, const double &gamma,
-    const std::vector<std::vector<int>> &cny_fault,
-    const std::vector<std::vector<double>> &coor_fault,
-    const std::vector<std::vector<double>> &obs_points,
-    const std::vector<double> &dvec,
-    const std::vector<std::vector<double>> &obs_unitvec,
-    const std::vector<double> &obs_sigma, const double &leta,
-    const std::unordered_map<int, std::vector<int>> &node_to_elem,
-    const std::vector<int> &id_dof, const std::vector<int> &lmat_index,
-    const std::vector<double> &lmat_val,
-    const std::vector<std::vector<double>> &llmat, const int &nsar,
-    const int &ngnss, const int &nparticle_slip) {
-    std::random_device seed_gen;
-    std::mt19937 engine(seed_gen());
-    // probability distribution for MCCMC metropolis test
-    std::uniform_real_distribution<> dist_metropolis(0., 1.);
-    // standard normal distribution
-    std::normal_distribution<> dist_stnorm(0., 1.);
-
-    // number of the samples
-    const int n_particle = particles.size();
-    // dimension of the samples
-    const int ndim = particles.at(0).size();
-
-    // list for resampled particles
-    std::vector<std::vector<double>> particles_new(n_particle);
-    // list for negative log likelihood of the resampled particles
-    std::vector<double> likelihood_ls_new(n_particle);
-
-    // resampling
-    // list for the indice of original particle of each resampled particle
-    std::vector<double> resampled_idx(n_particle);
-    double deno = n_particle;
-    std::vector<double> uvec(n_particle);
-    for (int n = 0; n < uvec.size(); n++) {
-        std::uniform_real_distribution<> dist1(n / deno, (n + 1) / deno);
-        uvec.at(n) = dist1(engine);
-    }
-    std::vector<double> cumsum(n_particle);
-    cumsum.at(0) = weights.at(0);
-    for (int n = 0; n < n_particle - 1; n++) {
-        cumsum.at(n + 1) = cumsum.at(n) + weights.at(n + 1);
-    }
-    for (int i_particle = 0; i_particle < n_particle; i_particle++) {
-        auto it =
-            std::lower_bound(cumsum.begin(), cumsum.end(), uvec.at(i_particle));
-        int i = std::distance(cumsum.begin(), it);
-        resampled_idx.at(i_particle) = i;
-    }
-
-    // assigned_id[i_particle] =
-    //  {original id of particles resampled to be i_particle}
-    std::unordered_map<int, std::vector<int>> assigned_id;
-    for (int i_particle = 0; i_particle < n_particle; i_particle++) {
-        assigned_id[i_particle] = {};
-    }
-    for (int i_particle = 0; i_particle < n_particle; i_particle++) {
-        int j_particle = resampled_idx.at(i_particle);
-        assigned_id[j_particle].push_back(i_particle);
-    }
-
-    // LAPACK function for LU decomposition of matrix
-    LAPACKE_dpotrf(LAPACK_ROW_MAJOR, 'L', ndim, &cov_flat[0], ndim);
-
-    // MCMC sampling from the updated distribution
-#pragma omp parallel for schedule(dynamic)
-    for (int i_particle = 0; i_particle < n_particle; i_particle++) {
-        // if (assigned_id[i_particle].size() == 0) {
-        //     // no need to start MCMC
-        //     continue;
-        // }
-
-        // ----_cur means current configuration
-        std::vector<double> particle_cur = particles.at(i_particle);
-
-        for (int j_particle : assigned_id[i_particle]) {
-            double likelihood_cur = calc_likelihood(
-                particle_cur, cny_fault, coor_fault, dvec, obs_points,
-                obs_unitvec, obs_sigma, leta, node_to_elem, id_dof, nsar, ngnss,
-                lmat_index, lmat_val, llmat, nparticle_slip);
-            // propose particle_cand
-            std::vector<double> rand(ndim);
-#pragma omp critical
-            {
-                for (int idim = 0; idim < ndim; idim++) {
-                    rand.at(idim) = dist_stnorm(engine);
-                }
-            }
-            std::vector<double> particle_cand(ndim);
-            for (int idim = 0; idim < ndim; idim++) {
-                particle_cand[idim] = particle_cur[idim];
-                for (int jdim = 0; jdim < idim + 1; jdim++) {
-                    particle_cand[idim] +=
-                        cov_flat[idim * ndim + jdim] * rand[jdim];
-                }
-            }
-
-            // calculate negative log likelihood of the proposed
-            // configuration
-            double likelihood_cand = calc_likelihood(
-                particle_cand, cny_fault, coor_fault, dvec, obs_points,
-                obs_unitvec, obs_sigma, leta, node_to_elem, id_dof, nsar, ngnss,
-                lmat_index, lmat_val, llmat, nparticle_slip);
-            double metropolis = dist_metropolis(engine);
-
-            // metropolis test and check domain of definition
-            if (particle_cand.at(4) < 90 && particle_cand.at(2) < 0 &&
-                particle_cand.at(7) < -2 &&
-                exp(gamma * (likelihood_cur - likelihood_cand)) > metropolis) {
-                // std::cout << "accepted likelihood: " << likelihood_cand
-                //           << std::endl;
-                particle_cur = particle_cand;
-                likelihood_cur = likelihood_cand;
-            } else {
-                // std::cout << "rejected likelihood: " << likelihood_cand
-                //           << std::endl;
-            }
-
-            // save to new particle list
-            particles_new.at(j_particle) = particle_cur;
-            likelihood_ls_new.at(j_particle) = likelihood_cur;
-            // likelihood_cur = calc_likelihood(
-            //     particle_cur, cny_fault, coor_fault, dvec, obs_points,
-            //     obs_unitvec, obs_sigma, leta, node_to_elem, id_dof, nsar,
-            //     ngnss, lmat_index, lmat_val, llmat, nparticle_slip);
-        }
-    }
-    // update configurations
-    likelihood_ls = likelihood_ls_new;
-    particles = particles_new;
-
-    return;
-}
-
 void smc_exec(std::vector<double> &particles_flat,
               const std::string &output_dir,
               const std::vector<std::vector<double>> &range,
@@ -611,8 +426,8 @@ void smc_exec(std::vector<double> &particles_flat,
               const std::vector<int> &lmat_index,
               const std::vector<double> &lmat_val,
               const std::vector<std::vector<double>> &llmat, const int &nsar,
-              const int &ngnss, const int &nparticle_slip, const int &myid,
-              const int &numprocs) {
+              const int &ngnss, const int &nparticle_slip,
+              const double &max_slip, const int &myid, const int &numprocs) {
     MPI_Status status;
     const int ndim = range.size();
     const int work_size = nparticle / numprocs;
@@ -632,7 +447,7 @@ void smc_exec(std::vector<double> &particles_flat,
                              work_init_likelihood, cny_fault, coor_fault,
                              obs_points, dvec, obs_unitvec, obs_sigma, leta,
                              node_to_elem, id_dof, lmat_index, lmat_val, llmat,
-                             nsar, ngnss, nparticle_slip, myid);
+                             nsar, ngnss, nparticle_slip, max_slip, myid);
     MPI_Gather(&work_init_likelihood.at(0), work_size, MPI_DOUBLE,
                &likelihood_ls[0], work_size, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
@@ -710,7 +525,7 @@ void smc_exec(std::vector<double> &particles_flat,
                            work_size, ndim, cov_flat, gamma, cny_fault,
                            coor_fault, obs_points, dvec, obs_unitvec, obs_sigma,
                            leta, node_to_elem, id_dof, lmat_index, lmat_val,
-                           llmat, nsar, ngnss, nparticle_slip, myid);
+                           llmat, nsar, ngnss, nparticle_slip, max_slip, myid);
         MPI_Barrier(MPI_COMM_WORLD);
         if (myid == 0) {
             en_time = MPI_Wtime();

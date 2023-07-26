@@ -26,19 +26,17 @@ double calc_prior(const std::vector<double> &svec, const double &log_alpha2,
                   const std::vector<int> &lmat_index,
                   const std::vector<double> &lmat_val);
 
-void gen_init_particles(std::vector<std::vector<double>> &particles,
-                        std::vector<double> &likelihood_ls,
-                        std::vector<double> &prior_ls, const int &nparticle,
-                        const std::vector<double> &dvec,
-                        const std::vector<double> &obs_sigma,
-                        const std::vector<double> &sigma2_full,
-                        const std::vector<double> &gmat_flat,
-                        const double &log_sigma_sar2,
-                        const double &log_sigma_gnss2, const int &nsar,
-                        const int &ngnss, const double &log_alpha2,
-                        const std::vector<int> &lmat_index,
-                        const std::vector<double> &lmat_val,
-                        const std::vector<std::vector<double>> &llmat);
+void gen_init_particles(
+    std::vector<std::vector<double>> &particles,
+    std::vector<double> &likelihood_ls, std::vector<double> &prior_ls,
+    const int &nparticle, const std::vector<double> &dvec,
+    const std::vector<double> &obs_sigma,
+    const std::vector<double> &sigma2_full,
+    const std::vector<double> &gmat_flat, const double &log_sigma_sar2,
+    const double &log_sigma_gnss2, const int &nsar, const int &ngnss,
+    const double &log_alpha2, const std::vector<int> &lmat_index,
+    const std::vector<double> &lmat_val,
+    const std::vector<std::vector<double>> &llmat, const double &max_slip);
 
 std::vector<double> calc_mean_std_vector(const std::vector<double> &vec);
 
@@ -66,7 +64,7 @@ void resample_particles(
     const std::vector<double> &gmat_flat, const double &log_sigma_sar2,
     const double &log_sigma_gnss2, const int &nsar, const int &ngnss,
     const double &log_alpha2, const std::vector<int> &lmat_index,
-    const std::vector<double> &lmat_val);
+    const std::vector<double> &lmat_val, const double &max_slip);
 
 double smc_exec(std::vector<std::vector<double>> &particles,
                 const std::string &output_dir, const int &nparticle,
@@ -79,5 +77,5 @@ double smc_exec(std::vector<std::vector<double>> &particles,
                 const std::vector<int> &lmat_index,
                 const std::vector<double> &lmat_val,
                 const std::vector<std::vector<double>> &llmat,
-                const std::vector<int> &id_dof);
+                const std::vector<int> &id_dof, const double &max_slip);
 }  // namespace smc_slip

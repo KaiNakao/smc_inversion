@@ -23,7 +23,8 @@ double calc_likelihood(
     const std::unordered_map<int, std::vector<int>> &node_to_elem,
     const std::vector<int> &id_dof, const int &nsar, const int &ngnss,
     const std::vector<int> &lmat_index, const std::vector<double> &lmat_val,
-    const std::vector<std::vector<double>> &llmat, const int nparticle_slip);
+    const std::vector<std::vector<double>> &llmat, const int nparticle_slip,
+    const double &max_slip);
 
 void sample_init_particles(std::vector<double> &particles_flat,
                            const int &nparticle, const int &ndim,
@@ -43,22 +44,8 @@ void work_eval_init_particles(
     const std::vector<int> &id_dof, const std::vector<int> &lmat_index,
     const std::vector<double> &lmat_val,
     const std::vector<std::vector<double>> &llmat, const int &nsar,
-    const int &ngnss, const int &nparticle_slip, const int &myid);
-
-std::vector<std::vector<double>> gen_init_particles(
-    const int &nparticle, const std::vector<std::vector<double>> &range,
-    std::vector<double> &likelihood_ls,
-    const std::vector<std::vector<int>> &cny_fault,
-    const std::vector<std::vector<double>> &coor_fault,
-    const std::vector<std::vector<double>> &obs_points,
-    const std::vector<double> &dvec,
-    const std::vector<std::vector<double>> &obs_unitvec,
-    const std::vector<double> &obs_sigma, const double &leta,
-    const std::unordered_map<int, std::vector<int>> &node_to_elem,
-    const std::vector<int> &id_dof, const std::vector<int> &lmat_index,
-    const std::vector<double> &lmat_val,
-    const std::vector<std::vector<double>> &llmat, const int &nsar,
-    const int &ngnss, const int &nparticle_slip);
+    const int &ngnss, const int &nparticle_slip, const double &max_slip,
+    const int &myid);
 
 std::vector<double> calc_mean_std_vector(const std::vector<double> &vec);
 
@@ -85,10 +72,12 @@ void reorder_to_send(std::vector<int> &assigned_num,
                      const int &ndim, const int &numprocs,
                      const int &work_size);
 
-void resample_particles_parallel(
-    std::vector<std::vector<double>> &particles,
-    const std::vector<double> &weights, std::vector<double> &likelihood_ls,
-    std::vector<double> &cov_flat, const double &gamma,
+void work_mcmc_sampling(
+    const std::vector<int> &work_assigned_num,
+    const std::vector<double> &work_particles_flat,
+    std::vector<double> &work_particles_flat_new,
+    std::vector<double> &work_likelihood_ls_new, const int &work_size,
+    const int &ndim, const std::vector<double> &cov_flat, const double &gamma,
     const std::vector<std::vector<int>> &cny_fault,
     const std::vector<std::vector<double>> &coor_fault,
     const std::vector<std::vector<double>> &obs_points,
@@ -99,7 +88,8 @@ void resample_particles_parallel(
     const std::vector<int> &id_dof, const std::vector<int> &lmat_index,
     const std::vector<double> &lmat_val,
     const std::vector<std::vector<double>> &llmat, const int &nsar,
-    const int &ngnss, const int &nparticle_slip);
+    const int &ngnss, const int &nparticle_slip, const double &max_slip,
+    const int &myid);
 
 void smc_exec(std::vector<double> &particles_flat,
               const std::string &output_dir,
@@ -116,6 +106,6 @@ void smc_exec(std::vector<double> &particles_flat,
               const std::vector<int> &lmat_index,
               const std::vector<double> &lmat_val,
               const std::vector<std::vector<double>> &llmat, const int &nsar,
-              const int &ngnss, const int &nparticle_slip, const int &myid,
-              const int &numprocs);
+              const int &ngnss, const int &nparticle_slip,
+              const double &max_slip, const int &myid, const int &numprocs);
 }  // namespace smc_fault

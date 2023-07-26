@@ -61,19 +61,17 @@ double calc_prior(const std::vector<double> &svec, const double &log_alpha2,
     return lsvec.size() / 2. * log_alpha2 + prior;
 }
 
-void gen_init_particles(std::vector<std::vector<double>> &particles,
-                        std::vector<double> &likelihood_ls,
-                        std::vector<double> &prior_ls, const int &nparticle,
-                        const std::vector<double> &dvec,
-                        const std::vector<double> &obs_sigma,
-                        const std::vector<double> &sigma2_full,
-                        const std::vector<double> &gmat_flat,
-                        const double &log_sigma_sar2,
-                        const double &log_sigma_gnss2, const int &nsar,
-                        const int &ngnss, const double &log_alpha2,
-                        const std::vector<int> &lmat_index,
-                        const std::vector<double> &lmat_val,
-                        const std::vector<std::vector<double>> &llmat) {
+void gen_init_particles(
+    std::vector<std::vector<double>> &particles,
+    std::vector<double> &likelihood_ls, std::vector<double> &prior_ls,
+    const int &nparticle, const std::vector<double> &dvec,
+    const std::vector<double> &obs_sigma,
+    const std::vector<double> &sigma2_full,
+    const std::vector<double> &gmat_flat, const double &log_sigma_sar2,
+    const double &log_sigma_gnss2, const int &nsar, const int &ngnss,
+    const double &log_alpha2, const std::vector<int> &lmat_index,
+    const std::vector<double> &lmat_val,
+    const std::vector<std::vector<double>> &llmat, const double &max_slip) {
     std::random_device seed_gen;
     std::mt19937 engine(seed_gen());
     particles.resize(nparticle);
@@ -102,15 +100,16 @@ void gen_init_particles(std::vector<std::vector<double>> &particles,
             std::normal_distribution<> dist(mu_i, sqrt(sigma2_i));
             double x = dist(engine);
             double fx = cdf_norm(x, mu_i, sigma2_i);
+            double f1 = cdf_norm(max_slip, mu_i, sigma2_i);
             double f0 = cdf_norm(0, mu_i, sigma2_i);
 
-            // solve F(y) = (1 - F(0)) F(x) + F(0) by Newton's method
+            // solve F(y) = (F(1) - F(0)) F(x) + F(0) by Newton's method
             // where F(:) is CDF of normal distribution
             double y_i = mu_i;
             double err = 1.;
             double y_prev = y_i + err;
             while (err > pow(10, -8)) {
-                y_i -= (cdf_norm(y_i, mu_i, sigma2_i) - ((1 - f0) * fx + f0)) /
+                y_i -= (cdf_norm(y_i, mu_i, sigma2_i) - ((f1 - f0) * fx + f0)) /
                        pdf_norm(y_i, mu_i, sigma2_i);
                 err = fabs(y_i - y_prev);
                 y_prev = y_i;
@@ -267,7 +266,7 @@ void resample_particles(
     const std::vector<double> &gmat_flat, const double &log_sigma_sar2,
     const double &log_sigma_gnss2, const int &nsar, const int &ngnss,
     const double &log_alpha2, const std::vector<int> &lmat_index,
-    const std::vector<double> &lmat_val) {
+    const std::vector<double> &lmat_val, const double &max_slip) {
     std::random_device seed_gen;
     std::mt19937 engine(seed_gen());
     // probability distribution for MCCMC metropolis test
@@ -349,6 +348,8 @@ void resample_particles(
                 particle_cand[idim] = particle_cur[idim] + rand[idim];
                 // non negative constraints
                 particle_cand[idim] = fmax(0, particle_cand[idim]);
+                // max slip constraints
+                particle_cand[idim] = fmin(max_slip, particle_cand[idim]);
             }
 
             // calculate negative log likelihood/prior/posterior
@@ -398,7 +399,7 @@ double smc_exec(std::vector<std::vector<double>> &particles,
                 const std::vector<int> &lmat_index,
                 const std::vector<double> &lmat_val,
                 const std::vector<std::vector<double>> &llmat,
-                const std::vector<int> &id_dof) {
+                const std::vector<int> &id_dof, const double &max_slip) {
     // greens function
     const int ndim = gmat.at(0).size();
     std::vector<double> gmat_flat(gmat.size() * gmat.at(0).size());
@@ -415,7 +416,7 @@ double smc_exec(std::vector<std::vector<double>> &particles,
     gen_init_particles(particles, likelihood_ls, prior_ls, nparticle, dvec,
                        obs_sigma, sigma2_full, gmat_flat, log_sigma_sar2,
                        log_sigma_gnss2, nsar, ngnss, log_alpha2, lmat_index,
-                       lmat_val, llmat);
+                       lmat_val, llmat, max_slip);
 
     // output result of stage 0 (disabled)
     // std::ofstream ofs(output_dir + std::to_string(0) + ".csv");
@@ -462,7 +463,7 @@ double smc_exec(std::vector<std::vector<double>> &particles,
         resample_particles(particles, weights, likelihood_ls, prior_ls,
                            cov_flat, gamma, dvec, obs_sigma, sigma2_full,
                            gmat_flat, log_sigma_sar2, log_sigma_gnss2, nsar,
-                           ngnss, log_alpha2, lmat_index, lmat_val);
+                           ngnss, log_alpha2, lmat_index, lmat_val, max_slip);
 
         // output result of stage j(disabled)
         // std::ofstream ofs(output_dir + std::to_string(iter) + ".csv");
