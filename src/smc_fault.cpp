@@ -27,13 +27,13 @@ double calc_likelihood(
     double log_sigma_sar2 = particle.at(5);
     double log_sigma_gnss2 = particle.at(6);
     double log_alpha2 = particle.at(7);
-    double st_time, en_time;
-    st_time = MPI_Wtime();
+    // double st_time, en_time;
+    // st_time = MPI_Wtime();
     // Calculate greens function for the sampled fault
     auto gmat = gfunc::calc_greens_func(cny_fault, coor_fault, obs_points,
                                         obs_unitvec, leta, xf, yf, zf, strike,
                                         dip, node_to_elem, id_dof, nsar, ngnss);
-    en_time = MPI_Wtime();
+    // en_time = MPI_Wtime();
 
     // diag component of Sigma
     //  (variance matrix for the likelihood function of slip)
@@ -50,18 +50,27 @@ double calc_likelihood(
 
     // Sequential Monte Carlo sampling for slip
     // calculate negative log of likelihood
-    st_time = MPI_Wtime();
+    // st_time = MPI_Wtime();
     std::vector<std::vector<double>> particles_slip(nparticle_slip);
     double neglog = smc_slip::smc_exec(
         particles_slip, "output_slip/", nparticle_slip, dvec, obs_sigma,
         sigma2_full, gmat, log_sigma_sar2, log_sigma_gnss2, nsar, ngnss,
         log_alpha2, lmat_index, lmat_val, llmat, id_dof);
-    en_time = MPI_Wtime();
+    // en_time = MPI_Wtime();
     // std::cout << xf << " " << yf << " " << zf << " " << strike << " " << dip
     //           << " " << log_sigma_sar2 << " " << log_sigma_gnss2 << " "
     //           << log_alpha2 << " " << neglog << " " << en_time - st_time
     //           << std::endl;
     // std::cout << "smc etime: " << en_time - st_time << std::endl;
+    // double maxslip =
+    //     *std::max_element(particles_slip[0].begin(),
+    //     particles_slip[0].end());
+    // double sumslip = 0.;
+    // for (int i = 0; i < particles_slip.at(0).size(); i++) {
+    //     sumslip += particles_slip.at(0).at(i);
+    // }
+    // printf("max slip: %f\n", maxslip);
+    // printf("sum slip: %f\n", sumslip);
     return neglog;
 }
 
@@ -118,7 +127,8 @@ void work_eval_init_particles(
             obs_sigma, leta, node_to_elem, id_dof, nsar, ngnss, lmat_index,
             lmat_val, llmat, nparticle_slip);
         // std::cout << "iparticle: " << iparticle + myid * work_size
-        //           << " likelihood: " << work_init_likelihood.at(iparticle)
+        //           << " likelihood: " <<
+        //           work_init_likelihood.at(iparticle)
         //           << std::endl;
     }
 }

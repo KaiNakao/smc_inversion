@@ -50,17 +50,19 @@ int main(int argc, char *argv[]) {
     double lxi = std::stod(lxi_str);
     double leta = std::stod(leta_str);
     // num of patch
-    int nxi = lxi / 2.5;
-    int neta = leta / 2.5;
+    // int nxi = lxi / 2.5;
+    // int neta = leta / 1.5;
+    int nxi = 6;
+    int neta = 6;
 
     // generate output dir
     std::string output_dir =
-        "output_cv/output_" + lxi_str + "_" + leta_str + "/cv/";
+        "output_cv/output_" + lxi_str + "_" + leta_str + "/all/";
     // std::string output_dir = "output_cvtest/";
     std::string op = "mkdir -p " + output_dir;
     system(op.c_str());
-    const int nparticle_slip = 10000;
-    const int nparticle_fault = 2000;
+    const int nparticle_slip = 20000;
+    const int nparticle_fault = 20000;
     // set fault geometry
     // cny_fault[patch_id] = {node_id}
     std::vector<std::vector<int>> cny_fault;
@@ -111,15 +113,71 @@ int main(int argc, char *argv[]) {
     std::vector<double> lmat_val;
     init::gen_sparse_lmat(lmat, lmat_index, lmat_val);
 
-    const int ndim = 8;
-    const int nfold = 4;
-    cross_validation(output_dir, nfold, nparticle_fault, cny_fault, coor_fault,
-                     leta, node_to_elem, id_dof, lmat_index, lmat_val, ndim,
-                     llmat, nparticle_slip, myid, numprocs);
+    // const int ndim = 8;
+    // const int nfold = 4;
+    // cross_validation(output_dir, nfold, nparticle_fault, cny_fault,
+    // coor_fault,
+    //                  leta, node_to_elem, id_dof, lmat_index, lmat_val, ndim,
+    //                  llmat, nparticle_slip, myid, numprocs);
+
+    // // calculate diplacement for fixed fault and slip distribution
+    // std::vector<double> particle = {0.96512816,  -14.13392699, -13.38230125,
+    //                                 2.08155794,  74.50310946,  0.16392912,
+    //                                 -0.16778241, -3.08278596};
+    // std::string slip_path = "visualize/slip_mean.csv";
+    // std::ifstream ifs(slip_path);
+    // std::vector<double> slip(2 * coor_fault.size());
+    // for (int inode = 0; inode < coor_fault.size(); inode++) {
+    //     double sxi, seta;
+    //     ifs >> sxi >> seta;
+    //     // std::cout << sxi << " " << seta << std::endl;
+    //     slip.at(2 * inode) = sxi;
+    //     slip.at(2 * inode + 1) = seta;
+    // }
+    // std::vector<double> svec(2 * id_dof.size());
+    // for (int idim = 0; idim < id_dof.size(); idim++) {
+    //     int inode = id_dof.at(idim);
+    //     svec.at(2 * idim) = slip.at(2 * inode);
+    //     svec.at(2 * idim + 1) = slip.at(2 * inode + 1);
+    // }
+
+    // double xf = particle.at(0);
+    // double yf = particle.at(1);
+    // double zf = particle.at(2);
+    // double strike = particle.at(3);
+    // double dip = particle.at(4);
+    // double log_sigma_sar2 = particle.at(5);
+    // double log_sigma_gnss2 = particle.at(6);
+    // double log_alpha2 = particle.at(7);
+    // // Calculate greens function for the sampled fault
+    // auto gmat = gfunc::calc_greens_func(cny_fault, coor_fault, obs_points,
+    //                                     obs_unitvec, leta, xf, yf, zf,
+    //                                     strike, dip, node_to_elem, id_dof,
+    //                                     nsar, ngnss);
+    // const int ndim = gmat.at(0).size();
+    // std::vector<double> gmat_flat(gmat.size() * gmat.at(0).size());
+    // for (int i = 0; i < gmat.size(); i++) {
+    //     for (int j = 0; j < gmat.at(0).size(); j++) {
+    //         gmat_flat.at(i * ndim + j) = gmat.at(i).at(j);
+    //     }
+    // }
+
+    // std::vector<double> gsvec(dvec.size());
+    // cblas_dgemv(CblasRowMajor, CblasNoTrans, dvec.size(), svec.size(), 1.,
+    //             &gmat_flat[0], svec.size(), &svec[0], 1, 0., &gsvec[0], 1);
+    // // for (int iobs = 0; iobs < dvec.size(); iobs++) {
+    // //     std::cout << gsvec.at(iobs) << " " << dvec.at(iobs) << std::endl;
+    // // }
+    // std::ofstream ofs("visualize/dvec_est.dat");
+    // for (int iobs = 0; iobs < dvec.size(); iobs++) {
+    //     ofs << gsvec.at(iobs) << std::endl;
+    // }
+    // std::exit(1);
 
     // // Execute SMC for slip while fixing the fault
-    // std::vector<double> particle = {-1.29926, -23.2216,  -18.8675, 5.53965,
-    //                                 57.6866,  -0.934742, 1.17758,  -6.21048};
+    // std::vector<double> particle = {0.96512816,  -14.13392699, -13.38230125,
+    //                                 2.08155794,  74.50310946,  0.16392912,
+    //                                 -0.16778241, -3.08278596};
     // double st_time, en_time;
     // st_time = MPI_Wtime();
     // double likelihood = smc_fault::calc_likelihood(
@@ -130,7 +188,7 @@ int main(int argc, char *argv[]) {
     // std::cout << " result: " << likelihood << std::endl;
     // std::cout << " etime: " << en_time - st_time << std::endl;
     // std::exit(0);
-    //
+
     // std::vector<std::vector<double>> particles;
     // std::ifstream ifs(output_dir + "22.csv");
     // for (int iter = 0; iter < nparticle_fault; iter++) {
@@ -139,8 +197,8 @@ int main(int argc, char *argv[]) {
     //     ifs >> xf >> yf >> zf >> strike >> dip >> log_sigma_sar2 >>
     //         log_sigma_gnss2 >> log_alpha2 >> likelihood;
     //     auto particle = {
-    //         xf,        yf, zf, strike, dip, log_sigma_sar2,
-    //         log_sigma_gnss2, log_alpha2};
+    //         xf,        yf, zf, strike, dip, log_sigma_sar2, log_sigma_gnss2,
+    //         log_alpha2};
     //     particles.push_back(particle);
     // }
     // #pragma omp parallel for schedule(dynamic)
@@ -157,8 +215,8 @@ int main(int argc, char *argv[]) {
     //     double log_alpha2 = particle.at(7);
     //     // Calculate greens function for the sampled fault
     //     auto gmat = gfunc::calc_greens_func(
-    //         cny_fault, coor_fault, obs_points, obs_unitvec, leta, xf, yf,
-    //         zf, strike, dip, node_to_elem, id_dof, nsar, ngnss);
+    //         cny_fault, coor_fault, obs_points, obs_unitvec, leta, xf, yf, zf,
+    //         strike, dip, node_to_elem, id_dof, nsar, ngnss);
 
     //     // diag component of Sigma
     //     //  (variance matrix for the likelihood function of slip)
@@ -185,30 +243,24 @@ int main(int argc, char *argv[]) {
     //     system(op.c_str());
     //     double neglog = smc_slip::smc_exec(
     //         particles_slip, dir, nparticle_slip, dvec, obs_sigma,
-    //         sigma2_full, gmat, log_sigma_sar2, log_sigma_gnss2, nsar,
-    //         ngnss, log_alpha2, lmat_index, lmat_val, llmat, id_dof);
+    //         sigma2_full, gmat, log_sigma_sar2, log_sigma_gnss2, nsar, ngnss,
+    //         log_alpha2, lmat_index, lmat_val, llmat, id_dof);
     // }
     // std::exit(0);
 
-    // range for xf, yf, zf, strike, dip, log_sigma2_sar, log_sigma2_gnss,
-    // log_alpha2
-    // std::vector<std::vector<double>> range = {{-10, 10}, {-30, 0}, {-30, -1},
-    //                                           {-20, 20}, {50, 90}, {-2, 2},
-    //                                           {-2, 2},   {-10, -2}};
+    // range for xf, yf, zf, strike, dip, log_sigma2_sar,
+    // log_sigma2_gnss, log_alpha2
+    std::vector<std::vector<double>> range = {{-10, 10}, {-30, 0}, {-30, -1},
+                                              {-20, 20}, {50, 90}, {-2, 2},
+                                              {-2, 2},   {-10, 2}};
 
     // sequential monte carlo sampling for fault parameters
-    // numbers of samples for approximation of distributions
-    // std::vector<std::vector<double>> particles;
-    // smc_fault::smc_exec(particles, output_dir, range, nparticle_fault,
-    //                     cny_fault, coor_fault, obs_points, dvec,
-    //                     obs_unitvec, obs_sigma, leta, node_to_elem,
-    //                     id_dof, lmat_index, lmat_val, llmat, nsar, ngnss,
-    //                     nparticle_slip, myid, numprocs);
-    // aggregate_slip(2., output_dir + "21.csv", output_dir, nparticle_fault,
-    //                nparticle_slip, range.size(), lxi, leta, dvec, cny_fault,
-    //                coor_fault, obs_points, obs_unitvec, obs_sigma,
-    //                node_to_elem, id_dof, lmat_index, lmat_val, llmat, nsar,
-    //                ngnss, myid, numprocs);
+    std::vector<double> particles_flat;
+    smc_fault::smc_exec(particles_flat, output_dir, range, nparticle_fault,
+                        cny_fault, coor_fault, obs_points, dvec, obs_unitvec,
+                        obs_sigma, leta, node_to_elem, id_dof, lmat_index,
+                        lmat_val, llmat, nsar, ngnss, nparticle_slip, myid,
+                        numprocs);
     MPI_Finalize();
 }
 
@@ -533,53 +585,6 @@ void cross_validation(
         init::read_observation_cv_valid(nfold, cv_id, obs_points_val,
                                         obs_unitvec_val, obs_sigma_val,
                                         dvec_val, nsar_val, ngnss_val);
-
-        // std::vector<double> particles_flat_t;
-        // std::vector<double> work_particles_flat_t(work_size * ndim);
-        // if (myid == 0) {
-        //     particles_flat_t.resize(nparticle_fault * ndim);
-        //     std::ifstream ifs("tmp/init_samples.dat");
-        //     for (int iparticle = 0; iparticle < nparticle_fault; iparticle++)
-        //     {
-        //         for (int idim = 0; idim < ndim; idim++) {
-        //             ifs >> particles_flat_t.at(iparticle * ndim + idim);
-        //         }
-        //     }
-        // }
-        // MPI_Scatter(&particles_flat_t[0], work_size * ndim, MPI_DOUBLE,
-        //             &work_particles_flat_t.at(0), work_size * ndim,
-        //             MPI_DOUBLE, 0, MPI_COMM_WORLD);
-        // MPI_Barrier(MPI_COMM_WORLD);
-        // double st_time = MPI_Wtime();
-        // #pragma omp parallel for
-        // for (int iparticle = 0; iparticle < work_size; iparticle++) {
-        //     std::vector<double> particle(ndim);
-        //     for (int idim = 0; idim < ndim; idim++) {
-        //         particle.at(idim) =
-        //             work_particles_flat_t.at(iparticle * ndim + idim);
-        //     }
-        //     // calculate negative log likelihood for the sample
-        //     double st_time, en_time;
-        //     st_time = MPI_Wtime();
-        //     double likelihood = smc_fault::calc_likelihood(
-        //         particle, cny_fault, coor_fault, dvec, obs_points,
-        //         obs_unitvec, obs_sigma, leta, node_to_elem, id_dof, nsar,
-        //         ngnss, lmat_index, lmat_val, llmat, nparticle_slip);
-        //     en_time = MPI_Wtime();
-        //     // std::cout << "myid: " << myid << " etime: " << en_time -
-        //     st_time
-        //     //           << std::endl;
-        //     printf("myid: %d, etime: %f\n", myid, en_time - st_time);
-        //     // std::cout << "iparticle: " << iparticle + myid * work_size
-        //     //           << " likelihood: " <<
-        //     //           work_init_likelihood.at(iparticle)
-        //     //           << std::endl;
-        // }
-        // MPI_Barrier(MPI_COMM_WORLD);
-        // double en_time = MPI_Wtime();
-        // if (myid == 0) {
-        //     printf("total etime: %f\n", en_time - st_time);
-        // }
 
         std::vector<std::vector<double>> range = {
             {-10, 10}, {-30, 0}, {-30, -1}, {-20, 20},
