@@ -58,7 +58,7 @@ double calc_prior(const std::vector<double> &svec, const double &log_alpha2,
         prior += pow(lsvec.at(i), 2.) / (2. * exp(log_alpha2));
     }
 
-    return lsvec.size() / 2. * log_alpha2 + prior;
+    return prior;
 }
 
 void gen_init_particles(

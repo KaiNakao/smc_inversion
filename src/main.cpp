@@ -35,7 +35,8 @@ void cross_validation(
     const std::vector<int> &id_dof, const std::vector<int> &lmat_index,
     const std::vector<double> &lmat_val, const int &ndim,
     const std::vector<std::vector<double>> &llmat, const int &nparticle_slip,
-    const int &myid, const int &numprocs);
+    const double &max_slip, const int &nxi, const int &neta, const int &myid,
+    const int &numprocs);
 
 int main(int argc, char *argv[]) {
     int myid, numprocs;
@@ -43,40 +44,34 @@ int main(int argc, char *argv[]) {
     MPI_Comm_rank(MPI_COMM_WORLD, &myid);
     MPI_Comm_size(MPI_COMM_WORLD, &numprocs);
 
-    std::string lxi_str = argv[1];
-    std::string leta_str = argv[2];
-
     // length of the fault [km]
-    double lxi = std::stod(lxi_str);
-    double leta = std::stod(leta_str);
-    // num of patch
     // int nxi = lxi / 2.5;
     // int neta = leta / 1.5;
     int nxi = 6;
     int neta = 6;
 
     // generate output dir
-    std::string output_dir =
-        "output_cv/output_" + lxi_str + "_" + leta_str + "/all/";
+    std::string output_dir = "var_faultsize_max3/";
     // std::string output_dir = "output_cvtest/";
     std::string op = "mkdir -p " + output_dir;
     system(op.c_str());
     const int nparticle_slip = 20000;
     const int nparticle_fault = 20000;
-    // set fault geometry
-    // cny_fault[patch_id] = {node_id}
-    std::vector<std::vector<int>> cny_fault;
-    // coor_fault[node_id] = {node_coordinate}
-    std::vector<std::vector<double>> coor_fault;
-    // node_to_elem[node_id] = {patch_id containing the node}
-    std::unordered_map<int, std::vector<int>> node_to_elem;
-    // id_dof = {node_id which have degree of freedom}
-    // slip value at node on the edge is fixed to be zero, no degree of
-    // freedom.
-    std::vector<int> id_dof;
-    init::discretize_fault(lxi, leta, nxi, neta, cny_fault, coor_fault,
-                           node_to_elem, id_dof);
-    // linalg::print_matrix_double(coor_fault);
+
+    // // set fault geometry
+    // // cny_fault[patch_id] = {node_id}
+    // std::vector<std::vector<int>> cny_fault;
+    // // coor_fault[node_id] = {node_coordinate}
+    // std::vector<std::vector<double>> coor_fault;
+    // // node_to_elem[node_id] = {patch_id containing the node}
+    // std::unordered_map<int, std::vector<int>> node_to_elem;
+    // // id_dof = {node_id which have degree of freedom}
+    // // slip value at node on the edge is fixed to be zero, no degree of
+    // // freedom.
+    // std::vector<int> id_dof;
+    // init::discretize_fault(lxi, leta, nxi, neta, cny_fault, coor_fault,
+    //                        node_to_elem, id_dof);
+    // // linalg::print_matrix_double(coor_fault);
     // for (int i = 0; i < cny_fault.size(); i++) {
     //     for (int v : cny_fault.at(i)) {
     //         std::cout << v << " ";
@@ -100,28 +95,30 @@ int main(int argc, char *argv[]) {
                            obs_points, obs_unitvec, obs_sigma, dvec, nsar,
                            ngnss);
 
-    // calculate laplacian matrix
-    const int nnode_fault = coor_fault.size();
-    const double dxi = lxi / nxi;
-    const double deta = leta / neta;
-    // matrix L
-    auto lmat = init::gen_laplacian(nnode_fault, nxi, neta, dxi, deta, id_dof);
-    // matrix L^T L
-    auto llmat = init::calc_ll(lmat);
-    // sparse matrix form of lmat
-    std::vector<int> lmat_index;
-    std::vector<double> lmat_val;
-    init::gen_sparse_lmat(lmat, lmat_index, lmat_val);
+    // // calculate laplacian matrix
+    // const int nnode_fault = coor_fault.size();
+    // const double dxi = lxi / nxi;
+    // const double deta = leta / neta;
+    // // matrix L
+    // auto lmat = init::gen_laplacian(nnode_fault, nxi, neta, dxi, deta,
+    // id_dof);
+    // // matrix L^T L
+    // auto llmat = init::calc_ll(lmat);
+    // // sparse matrix form of lmat
+    // std::vector<int> lmat_index;
+    // std::vector<double> lmat_val;
+    // init::gen_sparse_lmat(lmat, lmat_index, lmat_val);
 
     // constrain max value for slip
     double max_slip = 3.;
 
-    // const int ndim = 8;
-    // const int nfold = 4;
-    // cross_validation(output_dir, nfold, nparticle_fault, cny_fault,
-    // coor_fault,
-    //                  leta, node_to_elem, id_dof, lmat_index, lmat_val, ndim,
-    //                  llmat, nparticle_slip, myid, numprocs);
+    //     const int ndim = 8;
+    //     const int nfold = 4;
+    //     cross_validation(output_dir, nfold, nparticle_fault, cny_fault,
+    //     coor_fault,
+    //                      leta, node_to_elem, id_dof, lmat_index, lmat_val,
+    //                      ndim, llmat, nparticle_slip, max_slip, myid,
+    //                      numprocs);
 
     // // calculate diplacement for fixed fault and slip distribution
     // std::vector<double> particle = {0.96512816,  -14.13392699, -13.38230125,
@@ -177,7 +174,6 @@ int main(int argc, char *argv[]) {
     // }
     // std::exit(1);
 
-    // // Execute SMC for slip while fixing the fault
     // std::vector<double> particle = {0.96512816,  -14.13392699, -13.38230125,
     //                                 2.08155794,  74.50310946,  0.16392912,
     //                                 -0.16778241, -3.08278596};
@@ -253,17 +249,15 @@ int main(int argc, char *argv[]) {
 
     // range for xf, yf, zf, strike, dip, log_sigma2_sar,
     // log_sigma2_gnss, log_alpha2
-    std::vector<std::vector<double>> range = {{-10, 10}, {-30, 0}, {-30, -1},
-                                              {-20, 20}, {50, 90}, {-2, 2},
-                                              {-2, 2},   {-10, 2}};
+    std::vector<std::vector<double>> range = {
+        {-10, 10}, {-30, 0}, {-30, -1}, {-20, 20}, {50, 90},
+        {-2, 2},   {-2, 2},  {-10, 2},  {1, 50},   {1, 50}};
 
     // sequential monte carlo sampling for fault parameters
     std::vector<double> particles_flat;
     smc_fault::smc_exec(particles_flat, output_dir, range, nparticle_fault,
-                        cny_fault, coor_fault, obs_points, dvec, obs_unitvec,
-                        obs_sigma, leta, node_to_elem, id_dof, lmat_index,
-                        lmat_val, llmat, nsar, ngnss, nparticle_slip, max_slip,
-                        myid, numprocs);
+                        obs_points, dvec, obs_unitvec, obs_sigma, nsar, ngnss,
+                        nparticle_slip, max_slip, nxi, neta, myid, numprocs);
     MPI_Finalize();
 }
 
@@ -569,7 +563,8 @@ void cross_validation(
     const std::vector<int> &id_dof, const std::vector<int> &lmat_index,
     const std::vector<double> &lmat_val, const int &ndim,
     const std::vector<std::vector<double>> &llmat, const int &nparticle_slip,
-    const double &max_slip, const int &myid, const int &numprocs) {
+    const double &max_slip, const int &nxi, const int &neta, const int &myid,
+    const int &numprocs) {
     const int work_size = nparticle_fault / numprocs;
     std::ofstream ofs(output_dir + "cv_score.dat");
     for (int cv_id = 0; cv_id < nfold; cv_id++) {
@@ -600,10 +595,9 @@ void cross_validation(
 
         std::vector<double> particles_flat;
         smc_fault::smc_exec(particles_flat, output_dir_cv, range,
-                            nparticle_fault, cny_fault, coor_fault, obs_points,
-                            dvec, obs_unitvec, obs_sigma, leta, node_to_elem,
-                            id_dof, lmat_index, lmat_val, llmat, nsar, ngnss,
-                            nparticle_slip, max_slip, myid, numprocs);
+                            nparticle_fault, obs_points, dvec, obs_unitvec,
+                            obs_sigma, nsar, ngnss, nparticle_slip, max_slip,
+                            nxi, neta, myid, numprocs);
         // MPI_Barrier(MPI_COMM_WORLD);
         // MPI_Finalize();
         // exit(0);

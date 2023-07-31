@@ -3,23 +3,16 @@
 #include <cstdlib>
 #include <fstream>
 
-#include "mpi.h"
-
 namespace smc_fault {
 
-double calc_likelihood(
-    const std::vector<double> &particle,
-    const std::vector<std::vector<int>> &cny_fault,
-    const std::vector<std::vector<double>> &coor_fault,
-    const std::vector<double> &dvec,
-    const std::vector<std::vector<double>> &obs_points,
-    const std::vector<std::vector<double>> &obs_unitvec,
-    const std::vector<double> &obs_sigma, const double &leta,
-    const std::unordered_map<int, std::vector<int>> &node_to_elem,
-    const std::vector<int> &id_dof, const int &nsar, const int &ngnss,
-    const std::vector<int> &lmat_index, const std::vector<double> &lmat_val,
-    const std::vector<std::vector<double>> &llmat, const int nparticle_slip,
-    const double &max_slip) {
+double calc_likelihood(const std::vector<double> &particle,
+                       const std::vector<double> &dvec,
+                       const std::vector<std::vector<double>> &obs_points,
+                       const std::vector<std::vector<double>> &obs_unitvec,
+                       const std::vector<double> &obs_sigma, const int &nsar,
+                       const int &ngnss, const int nparticle_slip,
+                       const double &max_slip, const int &nxi,
+                       const int &neta) {
     double xf = particle.at(0);
     double yf = particle.at(1);
     double zf = particle.at(2);
@@ -28,6 +21,36 @@ double calc_likelihood(
     double log_sigma_sar2 = particle.at(5);
     double log_sigma_gnss2 = particle.at(6);
     double log_alpha2 = particle.at(7);
+    double lxi = particle.at(8);
+    double leta = particle.at(9);
+
+    // set fault geometry
+    // cny_fault[patch_id] = {node_id}
+    std::vector<std::vector<int>> cny_fault;
+    // coor_fault[node_id] = {node_coordinate}
+    std::vector<std::vector<double>> coor_fault;
+    // node_to_elem[node_id] = {patch_id containing the node}
+    std::unordered_map<int, std::vector<int>> node_to_elem;
+    // id_dof = {node_id which have degree of freedom}
+    // slip value at node on the edge is fixed to be zero, no degree of
+    // freedom.
+    std::vector<int> id_dof;
+    init::discretize_fault(lxi, leta, nxi, neta, cny_fault, coor_fault,
+                           node_to_elem, id_dof);
+
+    // calculate laplacian matrix
+    const int nnode_fault = coor_fault.size();
+    const double dxi = lxi / nxi;
+    const double deta = leta / neta;
+    // matrix L
+    auto lmat = init::gen_laplacian(nnode_fault, nxi, neta, dxi, deta, id_dof);
+    // matrix L^T L
+    auto llmat = init::calc_ll(lmat);
+    // sparse matrix form of lmat
+    std::vector<int> lmat_index;
+    std::vector<double> lmat_val;
+    init::gen_sparse_lmat(lmat, lmat_index, lmat_val);
+
     // double st_time, en_time;
     // st_time = MPI_Wtime();
     // Calculate greens function for the sampled fault
@@ -105,18 +128,12 @@ void work_eval_init_particles(
     const int &work_size, const int &ndim,
     const std::vector<double> &work_particles_flat,
     std::vector<double> &work_init_likelihood,
-    const std::vector<std::vector<int>> &cny_fault,
-    const std::vector<std::vector<double>> &coor_fault,
     const std::vector<std::vector<double>> &obs_points,
     const std::vector<double> &dvec,
     const std::vector<std::vector<double>> &obs_unitvec,
-    const std::vector<double> &obs_sigma, const double &leta,
-    const std::unordered_map<int, std::vector<int>> &node_to_elem,
-    const std::vector<int> &id_dof, const std::vector<int> &lmat_index,
-    const std::vector<double> &lmat_val,
-    const std::vector<std::vector<double>> &llmat, const int &nsar,
-    const int &ngnss, const int &nparticle_slip, const double &max_slip,
-    const int &myid) {
+    const std::vector<double> &obs_sigma, const int &nsar, const int &ngnss,
+    const int &nparticle_slip, const double &max_slip, const int &nxi,
+    const int &neta, const int &myid) {
 #pragma omp parallel for
     for (int iparticle = 0; iparticle < work_size; iparticle++) {
         std::vector<double> particle(ndim);
@@ -124,16 +141,15 @@ void work_eval_init_particles(
             particle.at(idim) = work_particles_flat.at(iparticle * ndim + idim);
         }
         // calculate negative log likelihood for the sample
-        work_init_likelihood.at(iparticle) = calc_likelihood(
-            particle, cny_fault, coor_fault, dvec, obs_points, obs_unitvec,
-            obs_sigma, leta, node_to_elem, id_dof, nsar, ngnss, lmat_index,
-            lmat_val, llmat, nparticle_slip, max_slip);
+        work_init_likelihood.at(iparticle) =
+            calc_likelihood(particle, dvec, obs_points, obs_unitvec, obs_sigma,
+                            nsar, ngnss, nparticle_slip, max_slip, nxi, neta);
         // std::cout << "iparticle: " << iparticle + myid * work_size
         //           << " likelihood: " <<
         //           work_init_likelihood.at(iparticle)
         //           << std::endl;
     }
-}
+}  // namespace smc_fault
 
 std::vector<double> calc_mean_std_vector(const std::vector<double> &vec) {
     // ret = {mean, std} over the component of vector
@@ -318,24 +334,20 @@ void reorder_to_send(std::vector<int> &assigned_num,
     return;
 }
 
-void work_mcmc_sampling(
-    const std::vector<int> &work_assigned_num,
-    const std::vector<double> &work_particles_flat,
-    std::vector<double> &work_particles_flat_new,
-    std::vector<double> &work_likelihood_ls_new, const int &work_size,
-    const int &ndim, const std::vector<double> &cov_flat, const double &gamma,
-    const std::vector<std::vector<int>> &cny_fault,
-    const std::vector<std::vector<double>> &coor_fault,
-    const std::vector<std::vector<double>> &obs_points,
-    const std::vector<double> &dvec,
-    const std::vector<std::vector<double>> &obs_unitvec,
-    const std::vector<double> &obs_sigma, const double &leta,
-    const std::unordered_map<int, std::vector<int>> &node_to_elem,
-    const std::vector<int> &id_dof, const std::vector<int> &lmat_index,
-    const std::vector<double> &lmat_val,
-    const std::vector<std::vector<double>> &llmat, const int &nsar,
-    const int &ngnss, const int &nparticle_slip, const double &max_slip,
-    const int &myid) {
+void work_mcmc_sampling(const std::vector<int> &work_assigned_num,
+                        const std::vector<double> &work_particles_flat,
+                        std::vector<double> &work_particles_flat_new,
+                        std::vector<double> &work_likelihood_ls_new,
+                        const int &work_size, const int &ndim,
+                        const std::vector<double> &cov_flat,
+                        const double &gamma,
+                        const std::vector<std::vector<double>> &obs_points,
+                        const std::vector<double> &dvec,
+                        const std::vector<std::vector<double>> &obs_unitvec,
+                        const std::vector<double> &obs_sigma, const int &nsar,
+                        const int &ngnss, const int &nparticle_slip,
+                        const double &max_slip, const int &nxi, const int &neta,
+                        const int &myid) {
     std::random_device seed_gen;
     std::mt19937 engine(seed_gen());
     // probability distribution for MCCMC metropolis test
@@ -363,9 +375,8 @@ void work_mcmc_sampling(
         }
         for (int jparticle = 0; jparticle < nassigned; jparticle++) {
             double likelihood_cur = calc_likelihood(
-                particle_cur, cny_fault, coor_fault, dvec, obs_points,
-                obs_unitvec, obs_sigma, leta, node_to_elem, id_dof, nsar, ngnss,
-                lmat_index, lmat_val, llmat, nparticle_slip, max_slip);
+                particle_cur, dvec, obs_points, obs_unitvec, obs_sigma, nsar,
+                ngnss, nparticle_slip, max_slip, nxi, neta);
             // propose particle_cand
             std::vector<double> rand(ndim);
             for (int idim = 0; idim < ndim; idim++) {
@@ -383,13 +394,13 @@ void work_mcmc_sampling(
             // calculate negative log likelihood of the proposed
             // configuration
             double likelihood_cand = calc_likelihood(
-                particle_cand, cny_fault, coor_fault, dvec, obs_points,
-                obs_unitvec, obs_sigma, leta, node_to_elem, id_dof, nsar, ngnss,
-                lmat_index, lmat_val, llmat, nparticle_slip, max_slip);
+                particle_cand, dvec, obs_points, obs_unitvec, obs_sigma, nsar,
+                ngnss, nparticle_slip, max_slip, nxi, neta);
             double metropolis = dist_metropolis(engine);
 
             // metropolis test and check domain of definition
             if (particle_cand.at(4) < 90 && particle_cand.at(2) < 0 &&
+                particle_cand.at(8) > 0 && particle_cand.at(9) > 0 &&
                 exp(gamma * (likelihood_cur - likelihood_cand)) > metropolis) {
                 // std::cout << "accepted likelihood: " << likelihood_cand
                 //           << std::endl;
@@ -415,19 +426,13 @@ void smc_exec(std::vector<double> &particles_flat,
               const std::string &output_dir,
               const std::vector<std::vector<double>> &range,
               const int &nparticle,
-              const std::vector<std::vector<int>> &cny_fault,
-              const std::vector<std::vector<double>> &coor_fault,
               const std::vector<std::vector<double>> &obs_points,
               const std::vector<double> &dvec,
               const std::vector<std::vector<double>> &obs_unitvec,
-              const std::vector<double> &obs_sigma, const double &leta,
-              const std::unordered_map<int, std::vector<int>> &node_to_elem,
-              const std::vector<int> &id_dof,
-              const std::vector<int> &lmat_index,
-              const std::vector<double> &lmat_val,
-              const std::vector<std::vector<double>> &llmat, const int &nsar,
+              const std::vector<double> &obs_sigma, const int &nsar,
               const int &ngnss, const int &nparticle_slip,
-              const double &max_slip, const int &myid, const int &numprocs) {
+              const double &max_slip, const int &nxi, const int &neta,
+              const int &myid, const int &numprocs) {
     MPI_Status status;
     const int ndim = range.size();
     const int work_size = nparticle / numprocs;
@@ -444,10 +449,9 @@ void smc_exec(std::vector<double> &particles_flat,
                 &work_particles_flat.at(0), work_size * ndim, MPI_DOUBLE, 0,
                 MPI_COMM_WORLD);
     work_eval_init_particles(work_size, ndim, work_particles_flat,
-                             work_init_likelihood, cny_fault, coor_fault,
-                             obs_points, dvec, obs_unitvec, obs_sigma, leta,
-                             node_to_elem, id_dof, lmat_index, lmat_val, llmat,
-                             nsar, ngnss, nparticle_slip, max_slip, myid);
+                             work_init_likelihood, obs_points, dvec,
+                             obs_unitvec, obs_sigma, nsar, ngnss,
+                             nparticle_slip, max_slip, nxi, neta, myid);
     MPI_Gather(&work_init_likelihood.at(0), work_size, MPI_DOUBLE,
                &likelihood_ls[0], work_size, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
@@ -522,10 +526,9 @@ void smc_exec(std::vector<double> &particles_flat,
         }
         work_mcmc_sampling(work_assigned_num, work_particles_flat,
                            work_particles_flat_new, work_likelihood_ls_new,
-                           work_size, ndim, cov_flat, gamma, cny_fault,
-                           coor_fault, obs_points, dvec, obs_unitvec, obs_sigma,
-                           leta, node_to_elem, id_dof, lmat_index, lmat_val,
-                           llmat, nsar, ngnss, nparticle_slip, max_slip, myid);
+                           work_size, ndim, cov_flat, gamma, obs_points, dvec,
+                           obs_unitvec, obs_sigma, nsar, ngnss, nparticle_slip,
+                           max_slip, nxi, neta, myid);
         MPI_Barrier(MPI_COMM_WORLD);
         if (myid == 0) {
             en_time = MPI_Wtime();
@@ -622,5 +625,5 @@ void smc_exec(std::vector<double> &particles_flat,
             particles_flat, weights_fin, mean, nparticle, ndim);
     }
     return;
-}
+}  // namespace smc_fault
 }  // namespace smc_fault
