@@ -67,8 +67,7 @@ void resample_particles(
     const std::vector<double> &lmat_val, const double &max_slip);
 
 double smc_exec(std::vector<std::vector<double>> &particles,
-                const std::string &output_dir, const int &nparticle,
-                const std::vector<double> &dvec,
+                const int &nparticle, const std::vector<double> &dvec,
                 const std::vector<double> &obs_sigma,
                 const std::vector<double> &sigma2_full,
                 const std::vector<std::vector<double>> &gmat,
@@ -77,5 +76,6 @@ double smc_exec(std::vector<std::vector<double>> &particles,
                 const std::vector<int> &lmat_index,
                 const std::vector<double> &lmat_val,
                 const std::vector<std::vector<double>> &llmat,
-                const std::vector<int> &id_dof, const double &max_slip);
+                const std::vector<int> &id_dof, const double &max_slip,
+                const int &flag_output, const std::string &output_path);
 }  // namespace smc_slip

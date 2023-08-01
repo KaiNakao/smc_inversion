@@ -2,6 +2,7 @@
 
 #include <cstdlib>
 #include <fstream>
+#include <string>
 
 namespace smc_fault {
 
@@ -11,8 +12,8 @@ double calc_likelihood(const std::vector<double> &particle,
                        const std::vector<std::vector<double>> &obs_unitvec,
                        const std::vector<double> &obs_sigma, const int &nsar,
                        const int &ngnss, const int nparticle_slip,
-                       const double &max_slip, const int &nxi,
-                       const int &neta) {
+                       const double &max_slip, const int &nxi, const int &neta,
+                       const int &flag_output, const std::string &output_path) {
     double xf = particle.at(0);
     double yf = particle.at(1);
     double zf = particle.at(2);
@@ -74,27 +75,12 @@ double calc_likelihood(const std::vector<double> &particle,
 
     // Sequential Monte Carlo sampling for slip
     // calculate negative log of likelihood
-    // st_time = MPI_Wtime();
-    std::vector<std::vector<double>> particles_slip(nparticle_slip);
+    std::vector<std::vector<double>> particles_slip;
     double neglog = smc_slip::smc_exec(
-        particles_slip, "output_slip/", nparticle_slip, dvec, obs_sigma,
-        sigma2_full, gmat, log_sigma_sar2, log_sigma_gnss2, nsar, ngnss,
-        log_alpha2, lmat_index, lmat_val, llmat, id_dof, max_slip);
-    // en_time = MPI_Wtime();
-    // std::cout << xf << " " << yf << " " << zf << " " << strike << " " << dip
-    //           << " " << log_sigma_sar2 << " " << log_sigma_gnss2 << " "
-    //           << log_alpha2 << " " << neglog << " " << en_time - st_time
-    //           << std::endl;
-    // std::cout << "smc etime: " << en_time - st_time << std::endl;
-    // double maxslip =
-    //     *std::max_element(particles_slip[0].begin(),
-    //     particles_slip[0].end());
-    // double sumslip = 0.;
-    // for (int i = 0; i < particles_slip.at(0).size(); i++) {
-    //     sumslip += particles_slip.at(0).at(i);
-    // }
-    // printf("max slip: %f\n", maxslip);
-    // printf("sum slip: %f\n", sumslip);
+        particles_slip, nparticle_slip, dvec, obs_sigma, sigma2_full, gmat,
+        log_sigma_sar2, log_sigma_gnss2, nsar, ngnss, log_alpha2, lmat_index,
+        lmat_val, llmat, id_dof, max_slip, flag_output, output_path);
+
     return neglog;
 }
 
@@ -140,16 +126,13 @@ void work_eval_init_particles(
         for (int idim = 0; idim < ndim; idim++) {
             particle.at(idim) = work_particles_flat.at(iparticle * ndim + idim);
         }
+
         // calculate negative log likelihood for the sample
-        work_init_likelihood.at(iparticle) =
-            calc_likelihood(particle, dvec, obs_points, obs_unitvec, obs_sigma,
-                            nsar, ngnss, nparticle_slip, max_slip, nxi, neta);
-        // std::cout << "iparticle: " << iparticle + myid * work_size
-        //           << " likelihood: " <<
-        //           work_init_likelihood.at(iparticle)
-        //           << std::endl;
+        work_init_likelihood.at(iparticle) = calc_likelihood(
+            particle, dvec, obs_points, obs_unitvec, obs_sigma, nsar, ngnss,
+            nparticle_slip, max_slip, nxi, neta, 0, "");
     }
-}  // namespace smc_fault
+}
 
 std::vector<double> calc_mean_std_vector(const std::vector<double> &vec) {
     // ret = {mean, std} over the component of vector
@@ -376,7 +359,7 @@ void work_mcmc_sampling(const std::vector<int> &work_assigned_num,
         for (int jparticle = 0; jparticle < nassigned; jparticle++) {
             double likelihood_cur = calc_likelihood(
                 particle_cur, dvec, obs_points, obs_unitvec, obs_sigma, nsar,
-                ngnss, nparticle_slip, max_slip, nxi, neta);
+                ngnss, nparticle_slip, max_slip, nxi, neta, 0, "");
             // propose particle_cand
             std::vector<double> rand(ndim);
             for (int idim = 0; idim < ndim; idim++) {
@@ -395,7 +378,7 @@ void work_mcmc_sampling(const std::vector<int> &work_assigned_num,
             // configuration
             double likelihood_cand = calc_likelihood(
                 particle_cand, dvec, obs_points, obs_unitvec, obs_sigma, nsar,
-                ngnss, nparticle_slip, max_slip, nxi, neta);
+                ngnss, nparticle_slip, max_slip, nxi, neta, 0, "");
             double metropolis = dist_metropolis(engine);
 
             // metropolis test and check domain of definition
@@ -420,6 +403,36 @@ void work_mcmc_sampling(const std::vector<int> &work_assigned_num,
         }
     }
     return;
+}
+
+void obtain_final_slip_distribution(
+    const std::vector<double> &particles_flat, const int &work_size,
+    const int &ndim, std::vector<double> &work_particles_flat,
+    const std::vector<std::vector<double>> &obs_points,
+    const std::vector<double> &dvec,
+    const std::vector<std::vector<double>> &obs_unitvec,
+    const std::vector<double> &obs_sigma, const int &nsar, const int &ngnss,
+    const int &nparticle_slip, const double &max_slip, const int &nxi,
+    const int &neta, const int &myid, const std::string output_dir) {
+    // obtain slip distribution for final fault samples
+    MPI_Scatter(&particles_flat[0], work_size * ndim, MPI_DOUBLE,
+                &work_particles_flat.at(0), work_size * ndim, MPI_DOUBLE, 0,
+                MPI_COMM_WORLD);
+#pragma omp parallel for
+    for (int iparticle = 0; iparticle < work_size; iparticle++) {
+        std::vector<double> particle(ndim);
+        for (int idim = 0; idim < ndim; idim++) {
+            particle.at(idim) = work_particles_flat.at(iparticle * ndim + idim);
+        }
+
+        // calculate negative log likelihood for the sample
+        std::string slip_out_path =
+            output_dir + "slip/" +
+            std::to_string(myid * work_size + iparticle) + ".dat";
+        calc_likelihood(particle, dvec, obs_points, obs_unitvec, obs_sigma,
+                        nsar, ngnss, nparticle_slip, max_slip, nxi, neta, 1,
+                        slip_out_path);
+    }
 }
 
 void smc_exec(std::vector<double> &particles_flat,
@@ -596,26 +609,6 @@ void smc_exec(std::vector<double> &particles_flat,
         }
     }
 
-    // // output MAP value
-    // int map_id = 0.;
-    // int map_val = likelihood_ls.at(map_id);
-    // for (int iparticle = 0; iparticle < nparticle; iparticle++) {
-    //     double val = likelihood_ls.at(iparticle);
-    //     if (val < map_val) {
-    //         map_id = iparticle;
-    //         map_val = val;
-    //     }
-    // }
-    // std::cout << "map_id " << map_id << std::endl;
-    // std::cout << "map_val " << map_val << std::endl;
-    // std::ofstream ofs_map(output_dir + "map.csv");
-    // auto particle_map = particles.at(map_id);
-    // for (int idim = 0; idim < range.size(); idim++) {
-    //     ofs_map << particle_map.at(idim) << " ";
-    // }
-    // ofs_map << likelihood_ls.at(map_id);
-    // ofs_map << std::endl;
-
     // calculate mean and covariance of the samples
     if (myid == 0) {
         std::vector<double> weights_fin(nparticle, 1. / nparticle);
@@ -624,6 +617,11 @@ void smc_exec(std::vector<double> &particles_flat,
         std::vector<double> cov_flat = calc_cov_particles(
             particles_flat, weights_fin, mean, nparticle, ndim);
     }
+
+    obtain_final_slip_distribution(
+        particles_flat, work_size, ndim, work_particles_flat, obs_points, dvec,
+        obs_unitvec, obs_sigma, nsar, ngnss, nparticle_slip, max_slip, nxi,
+        neta, myid, output_dir);
     return;
-}  // namespace smc_fault
+}
 }  // namespace smc_fault

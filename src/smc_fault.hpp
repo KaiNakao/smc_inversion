@@ -19,7 +19,8 @@ double calc_likelihood(const std::vector<double> &particle,
                        const std::vector<std::vector<double>> &obs_unitvec,
                        const std::vector<double> &obs_sigma, const int &nsar,
                        const int &ngnss, const int nparticle_slip,
-                       const double &max_slip, const int &nxi, const int &neta);
+                       const double &max_slip, const int &nxi, const int &neta,
+                       const int &flag_output, const std::string &output_path);
 
 void sample_init_particles(std::vector<double> &particles_flat,
                            const int &nparticle, const int &ndim,
@@ -75,6 +76,16 @@ void work_mcmc_sampling(const std::vector<int> &work_assigned_num,
                         const int &ngnss, const int &nparticle_slip,
                         const double &max_slip, const int &nxi, const int &neta,
                         const int &myid);
+
+void obtain_final_slip_distribution(
+    const std::vector<double> &particles_flat, const int &work_size,
+    const int &ndim, std::vector<double> &work_particles_flat,
+    const std::vector<std::vector<double>> &obs_points,
+    const std::vector<double> &dvec,
+    const std::vector<std::vector<double>> &obs_unitvec,
+    const std::vector<double> &obs_sigma, const int &nsar, const int &ngnss,
+    const int &nparticle_slip, const double &max_slip, const int &nxi,
+    const int &neta, const int &myid, const std::string output_dir);
 
 void smc_exec(std::vector<double> &particles_flat,
               const std::string &output_dir,

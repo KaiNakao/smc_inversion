@@ -389,8 +389,7 @@ void resample_particles(
 }
 
 double smc_exec(std::vector<std::vector<double>> &particles,
-                const std::string &output_dir, const int &nparticle,
-                const std::vector<double> &dvec,
+                const int &nparticle, const std::vector<double> &dvec,
                 const std::vector<double> &obs_sigma,
                 const std::vector<double> &sigma2_full,
                 const std::vector<std::vector<double>> &gmat,
@@ -399,7 +398,8 @@ double smc_exec(std::vector<std::vector<double>> &particles,
                 const std::vector<int> &lmat_index,
                 const std::vector<double> &lmat_val,
                 const std::vector<std::vector<double>> &llmat,
-                const std::vector<int> &id_dof, const double &max_slip) {
+                const std::vector<int> &id_dof, const double &max_slip,
+                const int &flag_output, const std::string &output_path) {
     // greens function
     const int ndim = gmat.at(0).size();
     std::vector<double> gmat_flat(gmat.size() * gmat.at(0).size());
@@ -483,26 +483,28 @@ double smc_exec(std::vector<std::vector<double>> &particles,
         // }
         iter++;
     }
-    std::ofstream ofs(output_dir + std::to_string(iter) + ".csv");
-    for (int iparticle = 0; iparticle < nparticle; iparticle++) {
-        const std::vector<double> particle = particles.at(iparticle);
-        std::vector<double> slip(lmat_index.size() / 5);
-        for (int idof = 0; idof < id_dof.size(); idof++) {
-            int inode = id_dof.at(idof);
-            slip.at(2 * inode) = particle.at(2 * idof);
-            slip.at(2 * inode + 1) = particle.at(2 * idof + 1);
+    if (flag_output) {
+        std::ofstream ofs(output_path);
+        for (int iparticle = 0; iparticle < nparticle; iparticle++) {
+            const std::vector<double> particle = particles.at(iparticle);
+            std::vector<double> slip(lmat_index.size() / 5);
+            for (int idof = 0; idof < id_dof.size(); idof++) {
+                int inode = id_dof.at(idof);
+                slip.at(2 * inode) = particle.at(2 * idof);
+                slip.at(2 * inode + 1) = particle.at(2 * idof + 1);
+            }
+            for (int i = 0; i < slip.size(); i++) {
+                ofs << slip.at(i) << " ";
+            }
+            ofs << likelihood_ls.at(iparticle) + prior_ls.at(iparticle);
+            // ofs << std::endl;
+            ofs << " ";
+            double delta_norm = 0.;
+            calc_likelihood(particle, dvec, obs_sigma, sigma2_full, gmat_flat,
+                            log_sigma_sar2, log_sigma_gnss2, nsar, ngnss,
+                            delta_norm);
+            ofs << delta_norm << std::endl;
         }
-        for (int i = 0; i < slip.size(); i++) {
-            ofs << slip.at(i) << " ";
-        }
-        ofs << likelihood_ls.at(iparticle) + prior_ls.at(iparticle);
-        // ofs << std::endl;
-        ofs << " ";
-        double delta_norm = 0.;
-        calc_likelihood(particle, dvec, obs_sigma, sigma2_full, gmat_flat,
-                        log_sigma_sar2, log_sigma_gnss2, nsar, ngnss,
-                        delta_norm);
-        ofs << delta_norm << std::endl;
     }
 
     // product of S_j (sum for negative log value)
