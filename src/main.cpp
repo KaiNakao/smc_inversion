@@ -24,14 +24,14 @@ int main(int argc, char *argv[]) {
     int neta = 6;
 
     // generate output dir
-    std::string output_dir = "test/";
+    std::string output_dir = "toy_no_noise/";
     // std::string output_dir = "output_cvtest/";
     std::string op = "mkdir -p " + output_dir;
     system(op.c_str());
     op = "mkdir -p " + output_dir + "slip/";
     system(op.c_str());
-    const int nparticle_slip = 1000;
-    const int nparticle_fault = 1000;
+    const int nparticle_slip = 2000;
+    const int nparticle_fault = 2000;
 
     // // set fault geometry
     // // cny_fault[patch_id] = {node_id}
@@ -66,12 +66,11 @@ int main(int argc, char *argv[]) {
     std::vector<double> dvec;
     // number of observations for SAR/GNSS
     int nsar, ngnss;
-    init::read_observation("input/observation_with_gnss_reduced.csv",
-                           obs_points, obs_unitvec, obs_sigma, dvec, nsar,
-                           ngnss);
+    init::read_observation("input/observation_toy_no_noise.csv", obs_points,
+                           obs_unitvec, obs_sigma, dvec, nsar, ngnss);
 
     // constrain max value for slip
-    double max_slip = 3.;
+    double max_slip = 100.;
 
     //     const int ndim = 8;
     //     const int nfold = 4;
@@ -82,9 +81,7 @@ int main(int argc, char *argv[]) {
     //                      numprocs);
 
     // // calculate diplacement for fixed fault and slip distribution
-    // std::vector<double> particle = {0.96512816,  -14.13392699, -13.38230125,
-    //                                 2.08155794,  74.50310946,  0.16392912,
-    //                                 -0.16778241, -3.08278596};
+    // std::vector<double> particle = {5, -10, -15, 0, 60, 0, 0, 0, lxi, leta};
     // std::string slip_path = "visualize/slip_mean.csv";
     // std::ifstream ifs(slip_path);
     // std::vector<double> slip(2 * coor_fault.size());
@@ -135,20 +132,44 @@ int main(int argc, char *argv[]) {
     // }
     // std::exit(1);
 
-    // std::vector<double> particle = {
-    //     0.96512816, -14.13392699, -13.38230125, 2.08155794, 74.50310946,
-    //     0.16392912, -0.16778241,  -3.08278596,  10.,        10.,
-    // };
+    // std::ifstream ifs("/home/nakao/smc_inversion/toy_no_noise/52.csv");
+    // int ndim = 10;
+    // std::vector<double> mean(ndim);
+    // for (int i = 0; i < nparticle_fault; i++) {
+    //     std::vector<double> tmp(ndim + 1);
+    //     ifs >> tmp.at(0) >> tmp.at(1) >> tmp.at(2) >> tmp.at(3) >> tmp.at(4)
+    //     >>
+    //         tmp.at(5) >> tmp.at(6) >> tmp.at(7) >> tmp.at(8) >> tmp.at(9) >>
+    //         tmp.at(10);
+    //     for (int j = 0; j < ndim; j++) {
+    //         mean.at(j) += tmp.at(j);
+    //     }
+    // }
+    // for (int j = 0; j < ndim; j++) {
+    //     mean.at(j) /= nparticle_fault;
+    // }
+    // linalg::print_vector_double(mean);
+    // double lxi = mean.at(8);
+    // double leta = mean.at(9);
+    // std::ofstream ofs("visualize/mean_faultsize.dat");
+    // ofs << lxi << " " << leta << std::endl;
+    // std::vector<double> particle = mean;
+    // // particle[0] = 5.;
+    // // particle[1] = -10.;
+    // // particle[2] = -15.;
+    // // particle[3] = 0.;
+    // // particle[4] = 60.;
+    // // particle[8] = 30.;
+    // // particle[9] = 20.;
     // double st_time, en_time;
     // st_time = MPI_Wtime();
     // double likelihood = smc_fault::calc_likelihood(
     //     particle, dvec, obs_points, obs_unitvec, obs_sigma, nsar, ngnss,
-    //     nparticle_slip, max_slip, nxi, neta);
+    //     nparticle_slip, max_slip, nxi, neta, 1,
+    //     "visualize/slip_from_mean_fault.dat");
     // en_time = MPI_Wtime();
     // std::cout << " result: " << likelihood << std::endl;
     // std::cout << " etime: " << en_time - st_time << std::endl;
-    // std::exit(0);
-
     // std::exit(0);
 
     // range for xf, yf, zf, strike, dip, log_sigma2_sar,

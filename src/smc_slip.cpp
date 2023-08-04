@@ -28,8 +28,7 @@ double calc_likelihood(const std::vector<double> &svec,
     // st_time = MPI_Wtime();
     cblas_dgemv(CblasRowMajor, CblasNoTrans, dvec.size(), svec.size(), 1.,
                 &gmat_flat[0], svec.size(), &svec[0], 1, 0., &gsvec[0], 1);
-    // en_time = MPI_Wtime();
-    // printf("dgemv etime: %f\n", en_time - st_time);
+    // en_time = MPI_Wtime(); printf("dgemv etime: %f\n", en_time - st_time);
 
     delta_norm = 0.;
     double delta_loss = 0;

@@ -4,6 +4,8 @@
 #include <fstream>
 #include <string>
 
+#include "mpi.h"
+
 namespace smc_fault {
 
 double calc_likelihood(const std::vector<double> &particle,
@@ -14,6 +16,8 @@ double calc_likelihood(const std::vector<double> &particle,
                        const int &ngnss, const int nparticle_slip,
                        const double &max_slip, const int &nxi, const int &neta,
                        const int &flag_output, const std::string &output_path) {
+    // double st_time, en_time;
+    // st_time = MPI_Wtime();
     double xf = particle.at(0);
     double yf = particle.at(1);
     double zf = particle.at(2);
@@ -73,6 +77,10 @@ double calc_likelihood(const std::vector<double> &particle,
         }
     }
 
+    // en_time = MPI_Wtime();
+    // printf("other: %f\n", en_time - st_time);
+
+    // st_time = MPI_Wtime();
     // Sequential Monte Carlo sampling for slip
     // calculate negative log of likelihood
     std::vector<std::vector<double>> particles_slip;
@@ -81,6 +89,8 @@ double calc_likelihood(const std::vector<double> &particle,
         log_sigma_sar2, log_sigma_gnss2, nsar, ngnss, log_alpha2, lmat_index,
         lmat_val, llmat, id_dof, max_slip, flag_output, output_path);
 
+    // en_time = MPI_Wtime();
+    // printf("smc_slip: %f\n", en_time - st_time);
     return neglog;
 }
 
@@ -122,6 +132,7 @@ void work_eval_init_particles(
     const int &neta, const int &myid) {
 #pragma omp parallel for
     for (int iparticle = 0; iparticle < work_size; iparticle++) {
+        // std::cout << "iparticle: " << iparticle << std::endl;
         std::vector<double> particle(ndim);
         for (int idim = 0; idim < ndim; idim++) {
             particle.at(idim) = work_particles_flat.at(iparticle * ndim + idim);
@@ -461,10 +472,17 @@ void smc_exec(std::vector<double> &particles_flat,
     MPI_Scatter(&particles_flat[0], work_size * ndim, MPI_DOUBLE,
                 &work_particles_flat.at(0), work_size * ndim, MPI_DOUBLE, 0,
                 MPI_COMM_WORLD);
+    double st_time, en_time;
+    // st_time = MPI_Wtime();
     work_eval_init_particles(work_size, ndim, work_particles_flat,
                              work_init_likelihood, obs_points, dvec,
                              obs_unitvec, obs_sigma, nsar, ngnss,
                              nparticle_slip, max_slip, nxi, neta, myid);
+    // en_time = MPI_Wtime();
+    // MPI_Barrier(MPI_COMM_WORLD);
+    // printf("work_eval_init_particles etime: %f\n", en_time - st_time);
+    // MPI_Finalize();
+
     MPI_Gather(&work_init_likelihood.at(0), work_size, MPI_DOUBLE,
                &likelihood_ls[0], work_size, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
@@ -490,7 +508,7 @@ void smc_exec(std::vector<double> &particles_flat,
     std::vector<int> sum_assigned_ls(numprocs);
     std::vector<std::vector<double>> buf_likelihood(numprocs);
     std::vector<std::vector<double>> buf_particles_flat(numprocs);
-    double st_time, en_time;
+    // double st_time, en_time;
     while (1. - gamma > pow(10, -8)) {
         if (myid == 0) {
             st_time = MPI_Wtime();

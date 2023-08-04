@@ -6,6 +6,7 @@
 cd /home/nakao/smc_inversion
 make main
 
+export OMP_NUM_THREADS=20
 mpiexec -n 20 bash -c "ulimit -s unlimited"
-mpiexec -n 20 ./main > tmp.log
+mpiexec -n 20 ./main > toy.log
 
