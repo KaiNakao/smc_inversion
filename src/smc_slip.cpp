@@ -23,7 +23,8 @@ double calc_likelihood(const std::vector<double> &svec,
                        const double &log_sigma_gnss2, const int &nsar,
                        const int &ngnss, double &delta_norm,
                        std::vector<double> &gsvec) {
-    for (int i = 0; i < gsvec.size(); i++) {
+    const int m = gsvec.size();
+    for (int i = 0; i < m; i++) {
         gsvec[i] = 0.;
     }
     // delta norm is a measure for residual
@@ -35,7 +36,7 @@ double calc_likelihood(const std::vector<double> &svec,
 
     delta_norm = 0.;
     double delta_loss = 0;
-    for (int i = 0; i < dvec.size(); i++) {
+    for (int i = 0; i < m; i++) {
         delta_norm +=
             pow(dvec.at(i) - gsvec.at(i), 2.) / pow(obs_sigma.at(i), 2);
         delta_loss +=
@@ -49,17 +50,18 @@ double calc_prior(const std::vector<double> &svec, const double &log_alpha2,
                   const std::vector<int> &lmat_index,
                   const std::vector<double> &lmat_val,
                   std::vector<double> &lsvec) {
-    for (int i = 0; i < lsvec.size(); i++) {
+    const int n = lsvec.size();
+    for (int i = 0; i < n; i++) {
         lsvec[i] = 0.;
     }
-    for (int i = 0; i < lsvec.size(); i++) {
+    for (int i = 0; i < n; i++) {
         for (int j = 0; j < 5; j++) {
             lsvec[i] += lmat_val[5 * i + j] * svec[lmat_index[5 * i + j]];
         }
     }
 
     double prior = 0.;
-    for (int i = 0; i < lsvec.size(); i++) {
+    for (int i = 0; i < n; i++) {
         prior += pow(lsvec.at(i), 2.) / (2. * exp(log_alpha2));
     }
 
@@ -209,7 +211,7 @@ double find_next_gamma(const double &gamma_prev,
     return gamma;
 }
 
-std::vector<double> normalize_weights(const std::vector<double> &weights) {
+void normalize_weights(std::vector<double> &weights) {
     int n_particle = weights.size();
     std::vector<double> ret(n_particle);
     double sum = 0;
@@ -217,9 +219,9 @@ std::vector<double> normalize_weights(const std::vector<double> &weights) {
         sum += weights.at(n);
     }
     for (int n = 0; n < n_particle; n++) {
-        ret.at(n) = weights.at(n) / sum;
+        weights.at(n) /= sum;
     }
-    return ret;
+    return;
 }
 
 std::vector<double> calc_mean_particles(
@@ -298,9 +300,10 @@ void resample_particles(
     std::vector<double> resampled_idx(n_particle);
     double deno = n_particle;
     std::vector<double> uvec(n_particle);
+    std::uniform_real_distribution<> dist1(0, 1. / deno);
     for (int n = 0; n < n_particle; n++) {
-        std::uniform_real_distribution<> dist1(n / deno, (n + 1) / deno);
-        uvec.at(n) = dist1(engine);
+        // std::uniform_real_distribution<> dist1(n / deno, (n + 1) / deno);
+        uvec.at(n) = dist1(engine) + n / deno;
     }
     std::vector<double> cumsum(n_particle);
     cumsum.at(0) = weights.at(0);
@@ -328,6 +331,7 @@ void resample_particles(
     // LAPACK function for LU decomposition of matrix
     LAPACKE_dpotrf(LAPACK_ROW_MAJOR, 'L', ndim, &cov_flat[0], ndim);
 
+    std::vector<double> rand(ndim);
     // MCMC sampling from the updated distribution
     for (int i_particle = 0; i_particle < n_particle; i_particle++) {
         if (assigned_id[i_particle].size() == 0) {
@@ -344,7 +348,6 @@ void resample_particles(
 
         for (int j_particle : assigned_id[i_particle]) {
             // propose particle_cand
-            std::vector<double> rand(ndim);
             for (int idim = 0; idim < ndim; idim++) {
                 rand.at(idim) = dist_stnorm(engine);
             }
@@ -464,7 +467,7 @@ double smc_exec(std::vector<std::vector<double>> &particles,
         neglog_evidence_vec.push_back(neglog_evidence);
 
         // normalize weights (sum of weights needs to be 1)
-        weights = normalize_weights(weights);
+        normalize_weights(weights);
 
         // calculate mean and covariance of the samples
         std::vector<double> mean = calc_mean_particles(particles, weights);

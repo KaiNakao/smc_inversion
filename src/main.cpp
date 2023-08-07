@@ -31,7 +31,7 @@ int main(int argc, char *argv[]) {
     op = "mkdir -p " + output_dir + "slip/";
     system(op.c_str());
     const int nparticle_slip = 1000;
-    const int nparticle_fault = 2000;
+    const int nparticle_fault = 4000;
 
     // read observation data
     // coordinate of the observation points (x, y)
@@ -44,8 +44,9 @@ int main(int argc, char *argv[]) {
     std::vector<double> dvec;
     // number of observations for SAR/GNSS
     int nsar, ngnss;
-    init::read_observation("input/observation_toy_no_noise.csv", obs_points,
-                           obs_unitvec, obs_sigma, dvec, nsar, ngnss);
+    init::read_observation("input/observation_with_gnss_reduced.csv",
+                           obs_points, obs_unitvec, obs_sigma, dvec, nsar,
+                           ngnss);
 
     // constrain max value for slip
     double max_slip = 100.;
@@ -128,49 +129,50 @@ int main(int argc, char *argv[]) {
     // }
     // std::exit(1);
 
-    std::ifstream ifs("/home/nakao/smc_inversion/toy_no_noise/53.csv");
-    int ndim = 10;
-    std::vector<double> mean(ndim);
-    for (int i = 0; i < nparticle_fault; i++) {
-        std::vector<double> tmp(ndim + 1);
-        ifs >> tmp.at(0) >> tmp.at(1) >> tmp.at(2) >> tmp.at(3) >> tmp.at(4) >>
-            tmp.at(5) >> tmp.at(6) >> tmp.at(7) >> tmp.at(8) >> tmp.at(9) >>
-            tmp.at(10);
-        for (int j = 0; j < ndim; j++) {
-            mean.at(j) += tmp.at(j);
-        }
-    }
-    for (int j = 0; j < ndim; j++) {
-        mean.at(j) /= nparticle_fault;
-    }
-    std::vector<double> particle = mean;
-    // particle[0] = 5.;
-    // particle[1] = -10.;
-    // particle[2] = -15.;
-    // particle[3] = 0.;
-    // particle[4] = 60.;
+    // std::ifstream ifs("/home/nakao/smc_inversion/toy_no_noise/53.csv");
+    // int ndim = 10;
+    // std::vector<double> mean(ndim);
+    // for (int i = 0; i < nparticle_fault; i++) {
+    //     std::vector<double> tmp(ndim + 1);
+    //     ifs >> tmp.at(0) >> tmp.at(1) >> tmp.at(2) >> tmp.at(3) >> tmp.at(4)
+    //     >>
+    //         tmp.at(5) >> tmp.at(6) >> tmp.at(7) >> tmp.at(8) >> tmp.at(9) >>
+    //         tmp.at(10);
+    //     for (int j = 0; j < ndim; j++) {
+    //         mean.at(j) += tmp.at(j);
+    //     }
+    // }
+    // for (int j = 0; j < ndim; j++) {
+    //     mean.at(j) /= nparticle_fault;
+    // }
+    // std::vector<double> particle = mean;
+    // // particle[0] = 5.;
+    // // particle[1] = -10.;
+    // // particle[2] = -15.;
+    // // particle[3] = 0.;
+    // // particle[4] = 60.;
 
-    // // particle[5] = -4.;
-    // // particle[6] = -4.;
-    // particle[7] = -4.;
+    // // // particle[5] = -4.;
+    // // // particle[6] = -4.;
+    // // particle[7] = -4.;
 
-    // particle[8] = 30.;
-    // particle[9] = 20.;
-    linalg::print_vector_double(particle);
-    double lxi = particle.at(8);
-    double leta = particle.at(9);
-    std::ofstream ofs("visualize/mean_faultsize.dat");
-    ofs << lxi << " " << leta << std::endl;
-    double st_time, en_time;
-    st_time = MPI_Wtime();
-    double likelihood = smc_fault::calc_likelihood(
-        particle, dvec, obs_points, obs_unitvec, obs_sigma, nsar, ngnss,
-        nparticle_slip, max_slip, nxi, neta, 1,
-        "visualize/slip_from_mean_fault.dat");
-    en_time = MPI_Wtime();
-    std::cout << " result: " << likelihood << std::endl;
-    std::cout << " etime: " << en_time - st_time << std::endl;
-    std::exit(0);
+    // // particle[8] = 30.;
+    // // particle[9] = 20.;
+    // linalg::print_vector_double(particle);
+    // double lxi = particle.at(8);
+    // double leta = particle.at(9);
+    // std::ofstream ofs("visualize/mean_faultsize.dat");
+    // ofs << lxi << " " << leta << std::endl;
+    // double st_time, en_time;
+    // st_time = MPI_Wtime();
+    // double likelihood = smc_fault::calc_likelihood(
+    //     particle, dvec, obs_points, obs_unitvec, obs_sigma, nsar, ngnss,
+    //     nparticle_slip, max_slip, nxi, neta, 1,
+    //     "visualize/slip_from_mean_fault.dat");
+    // en_time = MPI_Wtime();
+    // std::cout << " result: " << likelihood << std::endl;
+    // std::cout << " etime: " << en_time - st_time << std::endl;
+    // std::exit(0);
 
     // range for xf, yf, zf, strike, dip, log_sigma2_sar,
     // log_sigma2_gnss, log_alpha2

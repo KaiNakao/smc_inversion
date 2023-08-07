@@ -47,7 +47,7 @@ double find_next_gamma(const double &gamma_prev,
                        std::vector<double> &likelihood_ls,
                        std::vector<double> &weights, double &neglog_evidence);
 
-std::vector<double> normalize_weights(const std::vector<double> &weights);
+void normalize_weights(std::vector<double> &weights);
 
 std::vector<double> calc_mean_particles(
     const std::vector<std::vector<double>> &particles,
