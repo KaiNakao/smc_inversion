@@ -17,6 +17,10 @@ int main(int argc, char *argv[]) {
     MPI_Comm_rank(MPI_COMM_WORLD, &myid);
     MPI_Comm_size(MPI_COMM_WORLD, &numprocs);
 
+    // random seed
+    std::random_device seed_gen;
+    std::mt19937 engine(12345);
+
     // length of the fault [km]
     // int nxi = lxi / 2.5;
     // int neta = leta / 1.5;
@@ -44,9 +48,8 @@ int main(int argc, char *argv[]) {
     std::vector<double> dvec;
     // number of observations for SAR/GNSS
     int nsar, ngnss;
-    init::read_observation("input/observation_with_gnss_reduced.csv",
-                           obs_points, obs_unitvec, obs_sigma, dvec, nsar,
-                           ngnss);
+    init::read_observation("input/observation_toy_no_noise.csv", obs_points,
+                           obs_unitvec, obs_sigma, dvec, nsar, ngnss);
 
     // constrain max value for slip
     double max_slip = 100.;
@@ -165,10 +168,12 @@ int main(int argc, char *argv[]) {
     // ofs << lxi << " " << leta << std::endl;
     // double st_time, en_time;
     // st_time = MPI_Wtime();
+    // std::vector<std::vector<double>> particles_slip(
+    //     nparticle_slip, std::vector<double>(2 * (nxi - 1) * (neta - 1)));
     // double likelihood = smc_fault::calc_likelihood(
     //     particle, dvec, obs_points, obs_unitvec, obs_sigma, nsar, ngnss,
     //     nparticle_slip, max_slip, nxi, neta, 1,
-    //     "visualize/slip_from_mean_fault.dat");
+    //     "visualize/slip_from_mean_fault.dat", engine, particles_slip);
     // en_time = MPI_Wtime();
     // std::cout << " result: " << likelihood << std::endl;
     // std::cout << " etime: " << en_time - st_time << std::endl;
@@ -180,9 +185,12 @@ int main(int argc, char *argv[]) {
         {-10, 10}, {-30, 0}, {-30, -1}, {-20, 20}, {50, 90},
         {-2, 2},   {-2, 2},  {-10, 2},  {1, 50},   {1, 50}};
     std::vector<double> particles_flat;
+    std::vector<std::vector<double>> particles_slip(
+        nparticle_slip, std::vector<double>(2 * (nxi - 1) * (neta - 1)));
     smc_fault::smc_exec(particles_flat, output_dir, range, nparticle_fault,
                         obs_points, dvec, obs_unitvec, obs_sigma, nsar, ngnss,
-                        nparticle_slip, max_slip, nxi, neta, myid, numprocs);
+                        nparticle_slip, max_slip, nxi, neta, myid, numprocs,
+                        engine, particles_slip);
 
     MPI_Finalize();
 }

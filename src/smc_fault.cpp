@@ -15,7 +15,9 @@ double calc_likelihood(const std::vector<double> &particle,
                        const std::vector<double> &obs_sigma, const int &nsar,
                        const int &ngnss, const int nparticle_slip,
                        const double &max_slip, const int &nxi, const int &neta,
-                       const int &flag_output, const std::string &output_path) {
+                       const int &flag_output, const std::string &output_path,
+                       std::mt19937 &engine,
+                       std::vector<std::vector<double>> &particles_slip) {
     double st_time, en_time;
     st_time = MPI_Wtime();
     double xf = particle.at(0);
@@ -80,11 +82,11 @@ double calc_likelihood(const std::vector<double> &particle,
     st_time = MPI_Wtime();
     // Sequential Monte Carlo sampling for slip
     // calculate negative log of likelihood
-    std::vector<std::vector<double>> particles_slip;
     double neglog = smc_slip::smc_exec(
         particles_slip, nparticle_slip, dvec, obs_sigma, sigma2_full, gmat,
         log_sigma_sar2, log_sigma_gnss2, nsar, ngnss, log_alpha2, lmat_index,
-        lmat_val, llmat_flat, id_dof, max_slip, flag_output, output_path);
+        lmat_val, llmat_flat, id_dof, max_slip, flag_output, output_path,
+        engine);
 
     en_time = MPI_Wtime();
     printf("smc_slip: %f\n", en_time - st_time);
@@ -93,13 +95,12 @@ double calc_likelihood(const std::vector<double> &particle,
 
 void sample_init_particles(std::vector<double> &particles_flat,
                            const int &nparticle, const int &ndim,
-                           const std::vector<std::vector<double>> &range) {
+                           const std::vector<std::vector<double>> &range,
+                           std::mt19937 &engine) {
     particles_flat.resize(nparticle * ndim);
 
     // probability distribution instance for generating samples from piror
     // (uniform distribution)
-    std::random_device seed_gen;
-    std::mt19937 engine(seed_gen());
     std::vector<std::uniform_real_distribution<>> dist_vec(range.size());
     for (int idim = 0; idim < range.size(); idim++) {
         std::uniform_real_distribution<> dist(range.at(idim).at(0),
@@ -126,8 +127,9 @@ void work_eval_init_particles(
     const std::vector<std::vector<double>> &obs_unitvec,
     const std::vector<double> &obs_sigma, const int &nsar, const int &ngnss,
     const int &nparticle_slip, const double &max_slip, const int &nxi,
-    const int &neta, const int &myid) {
-#pragma omp parallel for
+    const int &neta, const int &myid, std::mt19937 &engine,
+    std::vector<std::vector<double>> &particles_slip) {
+#pragma omp parallel for firstprivpate(particles_slip)
     for (int iparticle = 0; iparticle < work_size; iparticle++) {
         // std::cout << "iparticle: " << iparticle << std::endl;
         std::vector<double> particle(ndim);
@@ -138,7 +140,7 @@ void work_eval_init_particles(
         // calculate negative log likelihood for the sample
         work_init_likelihood.at(iparticle) = calc_likelihood(
             particle, dvec, obs_points, obs_unitvec, obs_sigma, nsar, ngnss,
-            nparticle_slip, max_slip, nxi, neta, 0, "");
+            nparticle_slip, max_slip, nxi, neta, 0, "", engine, particles_slip);
     }
 }
 
@@ -272,10 +274,8 @@ std::vector<double> calc_cov_particles(
 }
 
 std::vector<int> resample_particles(const int &nparticle,
-                                    const std::vector<double> &weights) {
-    std::random_device seed_gen;
-    std::mt19937 engine(seed_gen());
-
+                                    const std::vector<double> &weights,
+                                    std::mt19937 &engine) {
     // resampling
     // list for the indice of original particle of each resampled particle
     double deno = nparticle;
@@ -338,9 +338,8 @@ void work_mcmc_sampling(const std::vector<int> &work_assigned_num,
                         const std::vector<double> &obs_sigma, const int &nsar,
                         const int &ngnss, const int &nparticle_slip,
                         const double &max_slip, const int &nxi, const int &neta,
-                        const int &myid) {
-    std::random_device seed_gen;
-    std::mt19937 engine(seed_gen());
+                        const int &myid, std::mt19937 &engine,
+                        std::vector<std::vector<double>> &particles_slip) {
     // probability distribution for MCCMC metropolis test
     std::uniform_real_distribution<> dist_metropolis(0., 1.);
     // standard normal distribution
@@ -355,7 +354,7 @@ void work_mcmc_sampling(const std::vector<int> &work_assigned_num,
         id_start.at(work_size - 1) + work_assigned_num.at(work_size - 1);
     work_particles_flat_new.resize(sum_assigned * ndim);
     work_likelihood_ls_new.resize(sum_assigned);
-#pragma omp parallel for
+#pragma omp parallel for firstprivate(particles_slip)
     for (int iparticle = 0; iparticle < work_size; iparticle++) {
         int nassigned = work_assigned_num.at(iparticle);
         int istart = id_start.at(iparticle);
@@ -367,7 +366,8 @@ void work_mcmc_sampling(const std::vector<int> &work_assigned_num,
         for (int jparticle = 0; jparticle < nassigned; jparticle++) {
             double likelihood_cur = calc_likelihood(
                 particle_cur, dvec, obs_points, obs_unitvec, obs_sigma, nsar,
-                ngnss, nparticle_slip, max_slip, nxi, neta, 0, "");
+                ngnss, nparticle_slip, max_slip, nxi, neta, 0, "", engine,
+                particles_slip);
             // propose particle_cand
             std::vector<double> rand(ndim);
             for (int idim = 0; idim < ndim; idim++) {
@@ -386,7 +386,8 @@ void work_mcmc_sampling(const std::vector<int> &work_assigned_num,
             // configuration
             double likelihood_cand = calc_likelihood(
                 particle_cand, dvec, obs_points, obs_unitvec, obs_sigma, nsar,
-                ngnss, nparticle_slip, max_slip, nxi, neta, 0, "");
+                ngnss, nparticle_slip, max_slip, nxi, neta, 0, "", engine,
+                particles_slip);
             double metropolis = dist_metropolis(engine);
 
             // metropolis test and check domain of definition
@@ -421,12 +422,13 @@ void obtain_final_slip_distribution(
     const std::vector<std::vector<double>> &obs_unitvec,
     const std::vector<double> &obs_sigma, const int &nsar, const int &ngnss,
     const int &nparticle_slip, const double &max_slip, const int &nxi,
-    const int &neta, const int &myid, const std::string output_dir) {
+    const int &neta, const int &myid, const std::string output_dir,
+    std::mt19937 &engine, std::vector<std::vector<double>> &particles_slip) {
     // obtain slip distribution for final fault samples
     MPI_Scatter(&particles_flat[0], work_size * ndim, MPI_DOUBLE,
                 &work_particles_flat.at(0), work_size * ndim, MPI_DOUBLE, 0,
                 MPI_COMM_WORLD);
-#pragma omp parallel for
+#pragma omp parallel for firstprivate(particles_slip)
     for (int iparticle = 0; iparticle < work_size; iparticle++) {
         std::vector<double> particle(ndim);
         for (int idim = 0; idim < ndim; idim++) {
@@ -439,7 +441,7 @@ void obtain_final_slip_distribution(
             std::to_string(myid * work_size + iparticle) + ".dat";
         calc_likelihood(particle, dvec, obs_points, obs_unitvec, obs_sigma,
                         nsar, ngnss, nparticle_slip, max_slip, nxi, neta, 1,
-                        slip_out_path);
+                        slip_out_path, engine, particles_slip);
     }
 }
 
@@ -453,7 +455,8 @@ void smc_exec(std::vector<double> &particles_flat,
               const std::vector<double> &obs_sigma, const int &nsar,
               const int &ngnss, const int &nparticle_slip,
               const double &max_slip, const int &nxi, const int &neta,
-              const int &myid, const int &numprocs) {
+              const int &myid, const int &numprocs, std::mt19937 &engine,
+              std::vector<std::vector<double>> &particles_slip) {
     MPI_Status status;
     const int ndim = range.size();
     const int work_size = nparticle / numprocs;
@@ -462,7 +465,7 @@ void smc_exec(std::vector<double> &particles_flat,
     if (myid == 0) {
         likelihood_ls.resize(nparticle);
         // sampling from the prior distribution
-        sample_init_particles(particles_flat, nparticle, ndim, range);
+        sample_init_particles(particles_flat, nparticle, ndim, range, engine);
     }
     std::vector<double> work_particles_flat(work_size * ndim);
     std::vector<double> work_init_likelihood(work_size);
@@ -471,10 +474,10 @@ void smc_exec(std::vector<double> &particles_flat,
                 MPI_COMM_WORLD);
     double st_time, en_time;
     st_time = MPI_Wtime();
-    work_eval_init_particles(work_size, ndim, work_particles_flat,
-                             work_init_likelihood, obs_points, dvec,
-                             obs_unitvec, obs_sigma, nsar, ngnss,
-                             nparticle_slip, max_slip, nxi, neta, myid);
+    work_eval_init_particles(
+        work_size, ndim, work_particles_flat, work_init_likelihood, obs_points,
+        dvec, obs_unitvec, obs_sigma, nsar, ngnss, nparticle_slip, max_slip,
+        nxi, neta, myid, engine, particles_slip);
     en_time = MPI_Wtime();
     MPI_Barrier(MPI_COMM_WORLD);
     printf("work_eval_init_particles etime: %f\n", en_time - st_time);
@@ -525,7 +528,7 @@ void smc_exec(std::vector<double> &particles_flat,
             cov_flat = calc_cov_particles(particles_flat, weights, mean,
                                           nparticle, ndim);
 
-            assigned_num = resample_particles(nparticle, weights);
+            assigned_num = resample_particles(nparticle, weights, engine);
 
             reorder_to_send(assigned_num, particles_flat, nparticle, ndim,
                             numprocs, work_size);
@@ -557,7 +560,7 @@ void smc_exec(std::vector<double> &particles_flat,
                            work_particles_flat_new, work_likelihood_ls_new,
                            work_size, ndim, cov_flat, gamma, obs_points, dvec,
                            obs_unitvec, obs_sigma, nsar, ngnss, nparticle_slip,
-                           max_slip, nxi, neta, myid);
+                           max_slip, nxi, neta, myid, engine, particles_slip);
         MPI_Barrier(MPI_COMM_WORLD);
         if (myid == 0) {
             en_time = MPI_Wtime();
@@ -637,7 +640,7 @@ void smc_exec(std::vector<double> &particles_flat,
     obtain_final_slip_distribution(
         particles_flat, work_size, ndim, work_particles_flat, obs_points, dvec,
         obs_unitvec, obs_sigma, nsar, ngnss, nparticle_slip, max_slip, nxi,
-        neta, myid, output_dir);
+        neta, myid, output_dir, engine, particles_slip);
     return;
 }
 }  // namespace smc_fault

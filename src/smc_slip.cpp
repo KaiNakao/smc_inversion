@@ -79,10 +79,8 @@ void gen_init_particles(
     const double &log_alpha2, const std::vector<int> &lmat_index,
     const std::vector<double> &lmat_val, const std::vector<double> &llmat_flat,
     const double &max_slip, std::vector<double> &gsvec,
-    std::vector<double> &lsvec, const int &ndim) {
-    std::random_device seed_gen;
-    std::mt19937 engine(12345);
-    particles.resize(nparticle);
+    std::vector<double> &lsvec, const int &ndim, std::mt19937 &engine) {
+    // particles.resize(nparticle);
 
     // Gibbs sampling from Truncated Multi Variate Normal distribution
     std::vector<double> yvec(ndim, 0);
@@ -124,7 +122,9 @@ void gen_init_particles(
             }
             yvec.at(idim) = y_i;
         }
-        particles.at(iparticle) = yvec;
+        for (int idim = 0; idim < ndim; idim++) {
+            particles.at(iparticle).at(idim) = yvec.at(idim);
+        }
 
         // calculate negative log likelihood and prior
         double delta_norm;
@@ -275,9 +275,8 @@ void resample_particles(
     const double &log_sigma_gnss2, const int &nsar, const int &ngnss,
     const double &log_alpha2, const std::vector<int> &lmat_index,
     const std::vector<double> &lmat_val, const double &max_slip,
-    std::vector<double> &gsvec, std::vector<double> &lsvec) {
-    std::random_device seed_gen;
-    std::mt19937 engine(12345);
+    std::vector<double> &gsvec, std::vector<double> &lsvec,
+    std::mt19937 &engine) {
     // probability distribution for MCCMC metropolis test
     std::uniform_real_distribution<> dist_metropolis(0., 1.);
     // standard normal distribution
@@ -410,7 +409,9 @@ double smc_exec(std::vector<std::vector<double>> &particles,
                 const std::vector<double> &lmat_val,
                 const std::vector<double> &llmat_flat,
                 const std::vector<int> &id_dof, const double &max_slip,
-                const int &flag_output, const std::string &output_path) {
+                const int &flag_output, const std::string &output_path,
+                std::mt19937 &engine) {
+    std::cout << particles.size() << " " << particles.at(0).size() << std::endl;
     // greens function
     const int ndim = gmat.at(0).size();
     std::vector<double> gmat_flat(gmat.size() * gmat.at(0).size());
@@ -431,7 +432,8 @@ double smc_exec(std::vector<std::vector<double>> &particles,
     gen_init_particles(particles, likelihood_ls, prior_ls, nparticle, dvec,
                        obs_sigma, sigma2_full, gmat_flat, log_sigma_sar2,
                        log_sigma_gnss2, nsar, ngnss, log_alpha2, lmat_index,
-                       lmat_val, llmat_flat, max_slip, gsvec, lsvec, ndim);
+                       lmat_val, llmat_flat, max_slip, gsvec, lsvec, ndim,
+                       engine);
 
     // output result of stage 0 (disabled)
     // std::ofstream ofs(output_dir + std::to_string(0) + ".csv");
@@ -479,7 +481,7 @@ double smc_exec(std::vector<std::vector<double>> &particles,
                            cov_flat, gamma, dvec, obs_sigma, sigma2_full,
                            gmat_flat, log_sigma_sar2, log_sigma_gnss2, nsar,
                            ngnss, log_alpha2, lmat_index, lmat_val, max_slip,
-                           gsvec, lsvec);
+                           gsvec, lsvec, engine);
 
         // output result of stage j(disabled)
         // std::ofstream ofs(output_dir + std::to_string(iter) + ".csv");

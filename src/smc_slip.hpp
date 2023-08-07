@@ -39,8 +39,7 @@ void gen_init_particles(
     const double &log_alpha2, const std::vector<int> &lmat_index,
     const std::vector<double> &lmat_val, const std::vector<double> &llmat_flat,
     const double &max_slip, std::vector<double> &gsvec,
-    std::vector<double> &lsvec, const int &ndim);
-
+    std::vector<double> &lsvec, const int &ndim, std::mt19937 &engine);
 std::vector<double> calc_mean_std_vector(const std::vector<double> &vec);
 
 double find_next_gamma(const double &gamma_prev,
@@ -68,7 +67,8 @@ void resample_particles(
     const double &log_sigma_gnss2, const int &nsar, const int &ngnss,
     const double &log_alpha2, const std::vector<int> &lmat_index,
     const std::vector<double> &lmat_val, const double &max_slip,
-    std::vector<double> &gsvec, std::vector<double> &lsvec);
+    std::vector<double> &gsvec, std::vector<double> &lsvec,
+    std::mt19937 &engine);
 
 double smc_exec(std::vector<std::vector<double>> &particles,
                 const int &nparticle, const std::vector<double> &dvec,
@@ -81,5 +81,6 @@ double smc_exec(std::vector<std::vector<double>> &particles,
                 const std::vector<double> &lmat_val,
                 const std::vector<double> &llmat_flat,
                 const std::vector<int> &id_dof, const double &max_slip,
-                const int &flag_output, const std::string &output_path);
+                const int &flag_output, const std::string &output_path,
+                std::mt19937 &engine);
 }  // namespace smc_slip

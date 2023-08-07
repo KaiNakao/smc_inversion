@@ -20,11 +20,14 @@ double calc_likelihood(const std::vector<double> &particle,
                        const std::vector<double> &obs_sigma, const int &nsar,
                        const int &ngnss, const int nparticle_slip,
                        const double &max_slip, const int &nxi, const int &neta,
-                       const int &flag_output, const std::string &output_path);
+                       const int &flag_output, const std::string &output_path,
+                       std::mt19937 &engine,
+                       std::vector<std::vector<double>> &particles_slip);
 
 void sample_init_particles(std::vector<double> &particles_flat,
                            const int &nparticle, const int &ndim,
-                           const std::vector<std::vector<double>> &range);
+                           const std::vector<std::vector<double>> &range,
+                           std::mt19937 &engine);
 
 void work_eval_init_particles(
     const int &work_size, const int &ndim,
@@ -35,7 +38,8 @@ void work_eval_init_particles(
     const std::vector<std::vector<double>> &obs_unitvec,
     const std::vector<double> &obs_sigma, const int &nsar, const int &ngnss,
     const int &nparticle_slip, const double &max_slip, const int &nxi,
-    const int &neta, const int &myid);
+    const int &neta, const int &myid, std::mt19937 &engine,
+    std::vector<std::vector<double>> &particles_slip);
 
 std::vector<double> calc_mean_std_vector(const std::vector<double> &vec);
 
@@ -55,7 +59,8 @@ std::vector<double> calc_cov_particles(
     const int &nparticle, const int &ndim);
 
 std::vector<int> resample_particles(const int &nparticle,
-                                    const std::vector<double> &weights);
+                                    const std::vector<double> &weights,
+                                    std::mt19937 &engine);
 
 void reorder_to_send(std::vector<int> &assigned_num,
                      std::vector<double> &particles_flat, const int &nparticle,
@@ -75,7 +80,8 @@ void work_mcmc_sampling(const std::vector<int> &work_assigned_num,
                         const std::vector<double> &obs_sigma, const int &nsar,
                         const int &ngnss, const int &nparticle_slip,
                         const double &max_slip, const int &nxi, const int &neta,
-                        const int &myid);
+                        const int &myid, std::mt19937 &engine,
+                        std::vector<std::vector<double>> &particles_slip);
 
 void obtain_final_slip_distribution(
     const std::vector<double> &particles_flat, const int &work_size,
@@ -85,7 +91,8 @@ void obtain_final_slip_distribution(
     const std::vector<std::vector<double>> &obs_unitvec,
     const std::vector<double> &obs_sigma, const int &nsar, const int &ngnss,
     const int &nparticle_slip, const double &max_slip, const int &nxi,
-    const int &neta, const int &myid, const std::string output_dir);
+    const int &neta, const int &myid, const std::string output_dir,
+    std::mt19937 &engine, std::vector<std::vector<double>> &particles_slip);
 
 void smc_exec(std::vector<double> &particles_flat,
               const std::string &output_dir,
@@ -97,5 +104,6 @@ void smc_exec(std::vector<double> &particles_flat,
               const std::vector<double> &obs_sigma, const int &nsar,
               const int &ngnss, const int &nparticle_slip,
               const double &max_slip, const int &nxi, const int &neta,
-              const int &myid, const int &numprocs);
+              const int &myid, const int &numprocs, std::mt19937 &engine,
+              std::vector<std::vector<double>> &particles_slip);
 }  // namespace smc_fault
