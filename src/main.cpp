@@ -24,13 +24,13 @@ int main(int argc, char *argv[]) {
     int neta = 6;
 
     // generate output dir
-    std::string output_dir = "toy/";
+    std::string output_dir = "test/";
     // std::string output_dir = "output_cvtest/";
     std::string op = "mkdir -p " + output_dir;
     system(op.c_str());
     op = "mkdir -p " + output_dir + "slip/";
     system(op.c_str());
-    const int nparticle_slip = 50000;
+    const int nparticle_slip = 1000;
     const int nparticle_fault = 2000;
 
     // read observation data

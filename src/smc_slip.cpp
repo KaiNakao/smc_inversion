@@ -21,9 +21,12 @@ double calc_likelihood(const std::vector<double> &svec,
                        const std::vector<double> &gmat_flat,
                        const double &log_sigma_sar2,
                        const double &log_sigma_gnss2, const int &nsar,
-                       const int &ngnss, double &delta_norm) {
+                       const int &ngnss, double &delta_norm,
+                       std::vector<double> &gsvec) {
+    for (int i = 0; i < gsvec.size(); i++) {
+        gsvec[i] = 0.;
+    }
     // delta norm is a measure for residual
-    std::vector<double> gsvec(dvec.size());
     // double st_time, en_time;
     // st_time = MPI_Wtime();
     cblas_dgemv(CblasRowMajor, CblasNoTrans, dvec.size(), svec.size(), 1.,
@@ -44,8 +47,11 @@ double calc_likelihood(const std::vector<double> &svec,
 
 double calc_prior(const std::vector<double> &svec, const double &log_alpha2,
                   const std::vector<int> &lmat_index,
-                  const std::vector<double> &lmat_val) {
-    std::vector<double> lsvec(lmat_index.size() / 5);
+                  const std::vector<double> &lmat_val,
+                  std::vector<double> &lsvec) {
+    for (int i = 0; i < lsvec.size(); i++) {
+        lsvec[i] = 0.;
+    }
     for (int i = 0; i < lsvec.size(); i++) {
         for (int j = 0; j < 5; j++) {
             lsvec[i] += lmat_val[5 * i + j] * svec[lmat_index[5 * i + j]];
@@ -69,29 +75,30 @@ void gen_init_particles(
     const std::vector<double> &gmat_flat, const double &log_sigma_sar2,
     const double &log_sigma_gnss2, const int &nsar, const int &ngnss,
     const double &log_alpha2, const std::vector<int> &lmat_index,
-    const std::vector<double> &lmat_val,
-    const std::vector<std::vector<double>> &llmat, const double &max_slip) {
+    const std::vector<double> &lmat_val, const std::vector<double> &llmat_flat,
+    const double &max_slip, std::vector<double> &gsvec,
+    std::vector<double> &lsvec, const int &ndim) {
     std::random_device seed_gen;
-    std::mt19937 engine(seed_gen());
+    std::mt19937 engine(12345);
     particles.resize(nparticle);
 
     // Gibbs sampling from Truncated Multi Variate Normal distribution
-    std::vector<double> yvec(llmat.size(), 0);
+    std::vector<double> yvec(ndim, 0);
     // obtain nparticle samples
     for (int iparticle = 0; iparticle < nparticle; iparticle++) {
         // component-wise update
         for (int idim = 0; idim < yvec.size(); idim++) {
             // mean and variance for conditional probability distribution
             double sigma2_i =
-                pow(llmat.at(idim).at(idim) / exp(log_alpha2), -1);
+                pow(llmat_flat.at(idim * ndim + idim) / exp(log_alpha2), -1);
             double mu_i = 0;
             // loop for (jdim != idim)
             for (int jdim = 0; jdim < idim; jdim++) {
-                mu_i -= llmat.at(idim).at(jdim) / exp(log_alpha2) *
+                mu_i -= llmat_flat.at(idim * ndim + jdim) / exp(log_alpha2) *
                         yvec.at(jdim) * sigma2_i;
             }
             for (int jdim = idim + 1; jdim < yvec.size(); jdim++) {
-                mu_i -= llmat.at(idim).at(jdim) / exp(log_alpha2) *
+                mu_i -= llmat_flat.at(idim * ndim + jdim) / exp(log_alpha2) *
                         yvec.at(jdim) * sigma2_i;
             }
 
@@ -121,9 +128,9 @@ void gen_init_particles(
         double delta_norm;
         likelihood_ls.at(iparticle) = calc_likelihood(
             yvec, dvec, obs_sigma, sigma2_full, gmat_flat, log_sigma_sar2,
-            log_sigma_gnss2, nsar, ngnss, delta_norm);
+            log_sigma_gnss2, nsar, ngnss, delta_norm, gsvec);
         prior_ls.at(iparticle) =
-            calc_prior(yvec, log_alpha2, lmat_index, lmat_val);
+            calc_prior(yvec, log_alpha2, lmat_index, lmat_val, lsvec);
     }
 }
 
@@ -265,9 +272,10 @@ void resample_particles(
     const std::vector<double> &gmat_flat, const double &log_sigma_sar2,
     const double &log_sigma_gnss2, const int &nsar, const int &ngnss,
     const double &log_alpha2, const std::vector<int> &lmat_index,
-    const std::vector<double> &lmat_val, const double &max_slip) {
+    const std::vector<double> &lmat_val, const double &max_slip,
+    std::vector<double> &gsvec, std::vector<double> &lsvec) {
     std::random_device seed_gen;
-    std::mt19937 engine(seed_gen());
+    std::mt19937 engine(12345);
     // probability distribution for MCCMC metropolis test
     std::uniform_real_distribution<> dist_metropolis(0., 1.);
     // standard normal distribution
@@ -354,11 +362,12 @@ void resample_particles(
             // calculate negative log likelihood/prior/posterior
             // of the proposed configuration
             double delta_norm = 0.;
-            double likelihood_cand = calc_likelihood(
-                particle_cand, dvec, obs_sigma, sigma2_full, gmat_flat,
-                log_sigma_sar2, log_sigma_gnss2, nsar, ngnss, delta_norm);
-            double prior_cand =
-                calc_prior(particle_cand, log_alpha2, lmat_index, lmat_val);
+            double likelihood_cand =
+                calc_likelihood(particle_cand, dvec, obs_sigma, sigma2_full,
+                                gmat_flat, log_sigma_sar2, log_sigma_gnss2,
+                                nsar, ngnss, delta_norm, gsvec);
+            double prior_cand = calc_prior(particle_cand, log_alpha2,
+                                           lmat_index, lmat_val, lsvec);
             double post_cand = gamma * likelihood_cand + prior_cand;
 
             // metropolis test
@@ -396,7 +405,7 @@ double smc_exec(std::vector<std::vector<double>> &particles,
                 const int &nsar, const int &ngnss, const double &log_alpha2,
                 const std::vector<int> &lmat_index,
                 const std::vector<double> &lmat_val,
-                const std::vector<std::vector<double>> &llmat,
+                const std::vector<double> &llmat_flat,
                 const std::vector<int> &id_dof, const double &max_slip,
                 const int &flag_output, const std::string &output_path) {
     // greens function
@@ -407,6 +416,10 @@ double smc_exec(std::vector<std::vector<double>> &particles,
             gmat_flat.at(i * ndim + j) = gmat.at(i).at(j);
         }
     }
+    // gmat * svec
+    std::vector<double> gsvec(dvec.size());
+    // lmat * svec
+    std::vector<double> lsvec(lmat_index.size() / 5);
     // list for (negative log) likelihood for each particles
     std::vector<double> likelihood_ls(nparticle);
     // list for (negative log) prior for each particles
@@ -415,7 +428,7 @@ double smc_exec(std::vector<std::vector<double>> &particles,
     gen_init_particles(particles, likelihood_ls, prior_ls, nparticle, dvec,
                        obs_sigma, sigma2_full, gmat_flat, log_sigma_sar2,
                        log_sigma_gnss2, nsar, ngnss, log_alpha2, lmat_index,
-                       lmat_val, llmat, max_slip);
+                       lmat_val, llmat_flat, max_slip, gsvec, lsvec, ndim);
 
     // output result of stage 0 (disabled)
     // std::ofstream ofs(output_dir + std::to_string(0) + ".csv");
@@ -462,7 +475,8 @@ double smc_exec(std::vector<std::vector<double>> &particles,
         resample_particles(particles, weights, likelihood_ls, prior_ls,
                            cov_flat, gamma, dvec, obs_sigma, sigma2_full,
                            gmat_flat, log_sigma_sar2, log_sigma_gnss2, nsar,
-                           ngnss, log_alpha2, lmat_index, lmat_val, max_slip);
+                           ngnss, log_alpha2, lmat_index, lmat_val, max_slip,
+                           gsvec, lsvec);
 
         // output result of stage j(disabled)
         // std::ofstream ofs(output_dir + std::to_string(iter) + ".csv");
@@ -501,7 +515,7 @@ double smc_exec(std::vector<std::vector<double>> &particles,
             double delta_norm = 0.;
             calc_likelihood(particle, dvec, obs_sigma, sigma2_full, gmat_flat,
                             log_sigma_sar2, log_sigma_gnss2, nsar, ngnss,
-                            delta_norm);
+                            delta_norm, gsvec);
             ofs << delta_norm << std::endl;
         }
     }

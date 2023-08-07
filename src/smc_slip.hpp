@@ -20,11 +20,13 @@ double calc_likelihood(const std::vector<double> &svec,
                        const std::vector<double> &gmat_flat,
                        const double &log_sigma_sar2,
                        const double &log_sigma_gnss2, const int &nsar,
-                       const int &ngnss, double &delta_norm);
+                       const int &ngnss, double &delta_norm,
+                       std::vector<double> &gsvec);
 
 double calc_prior(const std::vector<double> &svec, const double &log_alpha2,
                   const std::vector<int> &lmat_index,
-                  const std::vector<double> &lmat_val);
+                  const std::vector<double> &lmat_val,
+                  std::vector<double> &lsvec);
 
 void gen_init_particles(
     std::vector<std::vector<double>> &particles,
@@ -35,8 +37,9 @@ void gen_init_particles(
     const std::vector<double> &gmat_flat, const double &log_sigma_sar2,
     const double &log_sigma_gnss2, const int &nsar, const int &ngnss,
     const double &log_alpha2, const std::vector<int> &lmat_index,
-    const std::vector<double> &lmat_val,
-    const std::vector<std::vector<double>> &llmat, const double &max_slip);
+    const std::vector<double> &lmat_val, const std::vector<double> &llmat_flat,
+    const double &max_slip, std::vector<double> &gsvec,
+    std::vector<double> &lsvec, const int &ndim);
 
 std::vector<double> calc_mean_std_vector(const std::vector<double> &vec);
 
@@ -64,7 +67,8 @@ void resample_particles(
     const std::vector<double> &gmat_flat, const double &log_sigma_sar2,
     const double &log_sigma_gnss2, const int &nsar, const int &ngnss,
     const double &log_alpha2, const std::vector<int> &lmat_index,
-    const std::vector<double> &lmat_val, const double &max_slip);
+    const std::vector<double> &lmat_val, const double &max_slip,
+    std::vector<double> &gsvec, std::vector<double> &lsvec);
 
 double smc_exec(std::vector<std::vector<double>> &particles,
                 const int &nparticle, const std::vector<double> &dvec,
@@ -75,7 +79,7 @@ double smc_exec(std::vector<std::vector<double>> &particles,
                 const int &nsar, const int &ngnss, const double &log_alpha2,
                 const std::vector<int> &lmat_index,
                 const std::vector<double> &lmat_val,
-                const std::vector<std::vector<double>> &llmat,
+                const std::vector<double> &llmat_flat,
                 const std::vector<int> &id_dof, const double &max_slip,
                 const int &flag_output, const std::string &output_path);
 }  // namespace smc_slip

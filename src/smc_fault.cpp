@@ -16,8 +16,8 @@ double calc_likelihood(const std::vector<double> &particle,
                        const int &ngnss, const int nparticle_slip,
                        const double &max_slip, const int &nxi, const int &neta,
                        const int &flag_output, const std::string &output_path) {
-    // double st_time, en_time;
-    // st_time = MPI_Wtime();
+    double st_time, en_time;
+    st_time = MPI_Wtime();
     double xf = particle.at(0);
     double yf = particle.at(1);
     double zf = particle.at(2);
@@ -49,20 +49,17 @@ double calc_likelihood(const std::vector<double> &particle,
     const double deta = leta / neta;
     // matrix L
     auto lmat = init::gen_laplacian(nnode_fault, nxi, neta, dxi, deta, id_dof);
-    // matrix L^T L
-    auto llmat = init::calc_ll(lmat);
     // sparse matrix form of lmat
     std::vector<int> lmat_index;
     std::vector<double> lmat_val;
     init::gen_sparse_lmat(lmat, lmat_index, lmat_val);
+    // matrix L^T L
+    auto llmat_flat = init::calc_ll(lmat);
 
-    // double st_time, en_time;
-    // st_time = MPI_Wtime();
     // Calculate greens function for the sampled fault
     auto gmat = gfunc::calc_greens_func(cny_fault, coor_fault, obs_points,
                                         obs_unitvec, leta, xf, yf, zf, strike,
                                         dip, node_to_elem, id_dof, nsar, ngnss);
-    // en_time = MPI_Wtime();
 
     // diag component of Sigma
     //  (variance matrix for the likelihood function of slip)
@@ -77,20 +74,20 @@ double calc_likelihood(const std::vector<double> &particle,
         }
     }
 
-    // en_time = MPI_Wtime();
-    // printf("other: %f\n", en_time - st_time);
+    en_time = MPI_Wtime();
+    printf("other: %f\n", en_time - st_time);
 
-    // st_time = MPI_Wtime();
+    st_time = MPI_Wtime();
     // Sequential Monte Carlo sampling for slip
     // calculate negative log of likelihood
     std::vector<std::vector<double>> particles_slip;
     double neglog = smc_slip::smc_exec(
         particles_slip, nparticle_slip, dvec, obs_sigma, sigma2_full, gmat,
         log_sigma_sar2, log_sigma_gnss2, nsar, ngnss, log_alpha2, lmat_index,
-        lmat_val, llmat, id_dof, max_slip, flag_output, output_path);
+        lmat_val, llmat_flat, id_dof, max_slip, flag_output, output_path);
 
-    // en_time = MPI_Wtime();
-    // printf("smc_slip: %f\n", en_time - st_time);
+    en_time = MPI_Wtime();
+    printf("smc_slip: %f\n", en_time - st_time);
     return neglog;
 }
 
@@ -473,15 +470,16 @@ void smc_exec(std::vector<double> &particles_flat,
                 &work_particles_flat.at(0), work_size * ndim, MPI_DOUBLE, 0,
                 MPI_COMM_WORLD);
     double st_time, en_time;
-    // st_time = MPI_Wtime();
+    st_time = MPI_Wtime();
     work_eval_init_particles(work_size, ndim, work_particles_flat,
                              work_init_likelihood, obs_points, dvec,
                              obs_unitvec, obs_sigma, nsar, ngnss,
                              nparticle_slip, max_slip, nxi, neta, myid);
-    // en_time = MPI_Wtime();
-    // MPI_Barrier(MPI_COMM_WORLD);
-    // printf("work_eval_init_particles etime: %f\n", en_time - st_time);
-    // MPI_Finalize();
+    en_time = MPI_Wtime();
+    MPI_Barrier(MPI_COMM_WORLD);
+    printf("work_eval_init_particles etime: %f\n", en_time - st_time);
+    MPI_Finalize();
+    std::exit(0);
 
     MPI_Gather(&work_init_likelihood.at(0), work_size, MPI_DOUBLE,
                &likelihood_ls[0], work_size, MPI_DOUBLE, 0, MPI_COMM_WORLD);

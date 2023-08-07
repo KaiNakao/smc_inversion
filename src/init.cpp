@@ -127,11 +127,20 @@ std::vector<std::vector<double>> gen_laplacian(const int &nnode, const int &nxi,
     return ret;
 }
 
-std::vector<std::vector<double>> calc_ll(
-    const std::vector<std::vector<double>> &lmat) {
-    std::vector<std::vector<double>> lmat_t = linalg::transpose(lmat);
-    std::vector<std::vector<double>> ll = linalg::matmat(lmat_t, lmat);
-    return ll;
+std::vector<double> calc_ll(const std::vector<std::vector<double>> &lmat) {
+    const int n = lmat.size();
+    const int m = lmat.at(0).size();
+    std::vector<double> lmat_flat(n * m);
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < m; j++) {
+            lmat_flat.at(i * m + j) = lmat.at(i).at(j);
+        }
+    }
+    std::vector<double> llmat_flat(m * m);
+    cblas_dgemm(CblasRowMajor, CblasTrans, CblasNoTrans, m, m, n, 1.,
+                &lmat_flat[0], m, &lmat_flat[0], m, 0., &llmat_flat[0], m);
+
+    return llmat_flat;
 }
 
 void gen_sparse_lmat(const std::vector<std::vector<double>> &lmat,
