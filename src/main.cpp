@@ -24,36 +24,14 @@ int main(int argc, char *argv[]) {
     int neta = 6;
 
     // generate output dir
-    std::string output_dir = "toy_no_noise/";
+    std::string output_dir = "toy/";
     // std::string output_dir = "output_cvtest/";
     std::string op = "mkdir -p " + output_dir;
     system(op.c_str());
     op = "mkdir -p " + output_dir + "slip/";
     system(op.c_str());
-    const int nparticle_slip = 2000;
+    const int nparticle_slip = 50000;
     const int nparticle_fault = 2000;
-
-    // // set fault geometry
-    // // cny_fault[patch_id] = {node_id}
-    // std::vector<std::vector<int>> cny_fault;
-    // // coor_fault[node_id] = {node_coordinate}
-    // std::vector<std::vector<double>> coor_fault;
-    // // node_to_elem[node_id] = {patch_id containing the node}
-    // std::unordered_map<int, std::vector<int>> node_to_elem;
-    // // id_dof = {node_id which have degree of freedom}
-    // // slip value at node on the edge is fixed to be zero, no degree of
-    // // freedom.
-    // std::vector<int> id_dof;
-    // init::discretize_fault(lxi, leta, nxi, neta, cny_fault, coor_fault,
-    //                        node_to_elem, id_dof);
-    // // linalg::print_matrix_double(coor_fault);
-    // for (int i = 0; i < cny_fault.size(); i++) {
-    //     for (int v : cny_fault.at(i)) {
-    //         std::cout << v << " ";
-    //     }
-    //     std::cout << std::endl;
-    // }
-    // std::exit(1);
 
     // read observation data
     // coordinate of the observation points (x, y)
@@ -81,7 +59,25 @@ int main(int argc, char *argv[]) {
     //                      numprocs);
 
     // // calculate diplacement for fixed fault and slip distribution
-    // std::vector<double> particle = {5, -10, -15, 0, 60, 0, 0, 0, lxi, leta};
+    // std::vector<double> particle = {
+    //     6.52944412,  -0.39564772, -19.7141383, 0.77200693, 65.32402038,
+    //     -0.92185183, 0.28261068,  4.85551402,  8.53677108, 8.61949196,
+    // };
+    // double lxi = particle.at(8);
+    // double leta = particle.at(9);
+    // // set fault geometry
+    // // cny_fault[patch_id] = {node_id}
+    // std::vector<std::vector<int>> cny_fault;
+    // // coor_fault[node_id] = {node_coordinate}
+    // std::vector<std::vector<double>> coor_fault;
+    // // node_to_elem[node_id] = {patch_id containing the node}
+    // std::unordered_map<int, std::vector<int>> node_to_elem;
+    // // id_dof = {node_id which have degree of freedom}
+    // // slip value at node on the edge is fixed to be zero, no degree of
+    // // freedom.
+    // std::vector<int> id_dof;
+    // init::discretize_fault(lxi, leta, nxi, neta, cny_fault, coor_fault,
+    //                        node_to_elem, id_dof);
     // std::string slip_path = "visualize/slip_mean.csv";
     // std::ifstream ifs(slip_path);
     // std::vector<double> slip(2 * coor_fault.size());
@@ -132,45 +128,49 @@ int main(int argc, char *argv[]) {
     // }
     // std::exit(1);
 
-    // std::ifstream ifs("/home/nakao/smc_inversion/toy_no_noise/52.csv");
-    // int ndim = 10;
-    // std::vector<double> mean(ndim);
-    // for (int i = 0; i < nparticle_fault; i++) {
-    //     std::vector<double> tmp(ndim + 1);
-    //     ifs >> tmp.at(0) >> tmp.at(1) >> tmp.at(2) >> tmp.at(3) >> tmp.at(4)
-    //     >>
-    //         tmp.at(5) >> tmp.at(6) >> tmp.at(7) >> tmp.at(8) >> tmp.at(9) >>
-    //         tmp.at(10);
-    //     for (int j = 0; j < ndim; j++) {
-    //         mean.at(j) += tmp.at(j);
-    //     }
-    // }
-    // for (int j = 0; j < ndim; j++) {
-    //     mean.at(j) /= nparticle_fault;
-    // }
-    // linalg::print_vector_double(mean);
-    // double lxi = mean.at(8);
-    // double leta = mean.at(9);
-    // std::ofstream ofs("visualize/mean_faultsize.dat");
-    // ofs << lxi << " " << leta << std::endl;
-    // std::vector<double> particle = mean;
-    // // particle[0] = 5.;
-    // // particle[1] = -10.;
-    // // particle[2] = -15.;
-    // // particle[3] = 0.;
-    // // particle[4] = 60.;
-    // // particle[8] = 30.;
-    // // particle[9] = 20.;
-    // double st_time, en_time;
-    // st_time = MPI_Wtime();
-    // double likelihood = smc_fault::calc_likelihood(
-    //     particle, dvec, obs_points, obs_unitvec, obs_sigma, nsar, ngnss,
-    //     nparticle_slip, max_slip, nxi, neta, 1,
-    //     "visualize/slip_from_mean_fault.dat");
-    // en_time = MPI_Wtime();
-    // std::cout << " result: " << likelihood << std::endl;
-    // std::cout << " etime: " << en_time - st_time << std::endl;
-    // std::exit(0);
+    std::ifstream ifs("/home/nakao/smc_inversion/toy_no_noise/53.csv");
+    int ndim = 10;
+    std::vector<double> mean(ndim);
+    for (int i = 0; i < nparticle_fault; i++) {
+        std::vector<double> tmp(ndim + 1);
+        ifs >> tmp.at(0) >> tmp.at(1) >> tmp.at(2) >> tmp.at(3) >> tmp.at(4) >>
+            tmp.at(5) >> tmp.at(6) >> tmp.at(7) >> tmp.at(8) >> tmp.at(9) >>
+            tmp.at(10);
+        for (int j = 0; j < ndim; j++) {
+            mean.at(j) += tmp.at(j);
+        }
+    }
+    for (int j = 0; j < ndim; j++) {
+        mean.at(j) /= nparticle_fault;
+    }
+    std::vector<double> particle = mean;
+    // particle[0] = 5.;
+    // particle[1] = -10.;
+    // particle[2] = -15.;
+    // particle[3] = 0.;
+    // particle[4] = 60.;
+
+    // // particle[5] = -4.;
+    // // particle[6] = -4.;
+    // particle[7] = -4.;
+
+    // particle[8] = 30.;
+    // particle[9] = 20.;
+    linalg::print_vector_double(particle);
+    double lxi = particle.at(8);
+    double leta = particle.at(9);
+    std::ofstream ofs("visualize/mean_faultsize.dat");
+    ofs << lxi << " " << leta << std::endl;
+    double st_time, en_time;
+    st_time = MPI_Wtime();
+    double likelihood = smc_fault::calc_likelihood(
+        particle, dvec, obs_points, obs_unitvec, obs_sigma, nsar, ngnss,
+        nparticle_slip, max_slip, nxi, neta, 1,
+        "visualize/slip_from_mean_fault.dat");
+    en_time = MPI_Wtime();
+    std::cout << " result: " << likelihood << std::endl;
+    std::cout << " etime: " << en_time - st_time << std::endl;
+    std::exit(0);
 
     // range for xf, yf, zf, strike, dip, log_sigma2_sar,
     // log_sigma2_gnss, log_alpha2
